@@ -12,9 +12,6 @@ import Text.ParserCombinators.Parsec.Language(emptyDef)
 -- Caution, Applicative.(<|>) conflicts with Parsec
 import Control.Applicative(Applicative,pure,(<*>),(<*),(*>),liftA2) 
 
-instance Applicative (GenParser s a) where
-  pure = return
-  (<*>) = ap
 
 
 langDef = emptyDef { 

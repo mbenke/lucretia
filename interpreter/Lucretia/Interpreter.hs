@@ -265,6 +265,10 @@ eval (EBreak l e) = do
   v <- eval e
   throwException (ExcBreak l v)
 eval (EFunc f) = return (VFun f)
+eval call@(ECall (EVar "print") es) = do
+  vs <- mapM eval es
+  mapM (lift . lift . lift . print . show) vs
+  return VNone
 eval call@(ECall e es) = do
   v <- eval e
   f@(Func as body) <- getVFun v

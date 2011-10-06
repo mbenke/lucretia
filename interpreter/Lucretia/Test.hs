@@ -41,6 +41,9 @@ test = do
   putStrLn "\n.../prog11, expect error: not enough args"
   -- runProg prog11  
   testParser "text11" text11
+  putStrLn "\n.../prog12, expect 4242"
+  -- runProg prog12  
+  testParser "text12" text12
 
 
 testIM :: IM () -> IO ()
@@ -125,3 +128,7 @@ text10 = "i=func(x)x;i(42,1)"
 -- expect error
 prog11 = expr $ ECall func1 []
 text11 = "i=func(x)x;i()"
+
+-- expect 4242
+text12 = "print(4242)"
+
