@@ -1,4 +1,4 @@
-module Lucretia.Test(test) where
+module Lucretia.Test(test, testParser) where
 import Lucretia.Syntax
 import Lucretia.Interpreter
 -- import qualified Lucretia.ParsecParser as Parser
@@ -48,7 +48,7 @@ test = do
 
 testIM :: IM () -> IO ()
 testIM m = do
-  res <- runIM m initState
+  let res = runIM m initState
   case res of
     Left e -> putWordsLn ["Error:",e]
     Right (a,state) -> do

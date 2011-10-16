@@ -11,24 +11,37 @@ import Control.Monad.State
 import Control.Monad.Trans
 import Control.Monad.Identity
 import Data.Maybe(catMaybes)
+import Data.List(intercalate)
 
 data IntState = IntState { 
   store :: Store, 
   freeLocs :: [Loc], 
   env :: Env,
-  scopes :: Scopes}
+  scopes :: Scopes,
+  output :: String}
 
-initState = IntState initStore initFreeLocs initEnv initScopes
+initState = IntState initStore initFreeLocs initEnv initScopes initOutput
 
 data Exception = ExcBreak Name Val deriving Show
 
-type IM a = ExceptionT Exception (StateT IntState (ErrorT String IO)) a
--- runIM :: IM a -> IntState -> IO (Either String (a,IntState))
-runIM m st = runErrorT (runStateT (runExceptionT m) st)
+type IM a = ExceptionT Exception (StateT IntState (ErrorT String Identity)) a
+-- runIM :: IM a -> IntState -> Either String (a,IntState)
+runIM m st = runIdentity (runErrorT (runStateT (runExceptionT m) st))
+
+runProgGetOutput :: Defs -> String
+runProgGetOutput p =
+  let res = runIM (evalDefs p) initState in
+  case res of
+    Left e -> "Error: "++e++"\n"
+    Right (a, state) ->
+      output state++
+      case a of
+        Left exc -> "Exception: "++show exc++"\n"
+        Right _ -> ""
 
 runProg :: Defs -> IO ()
 runProg p = do
-  res <- runIM (evalDefs p) initState
+  let res = runIM (evalDefs p) initState
   case res of
     Left e -> putStrLn ("Error: "++e)
     Right (a,state) -> do
@@ -207,6 +220,13 @@ getVar v =  do
   l <- getNameLoc v
   getLocContents l
 
+-- * Output
+initOutput = ""
+
+appendToOutput :: String -> IM ()
+appendToOutput s = modify $ \state -> state { 
+  output = output state ++ s}
+
 -- | Evaluate expressions
 eval :: Exp -> IM Val
 eval (EInt i) = return (VInt i)
@@ -267,7 +287,9 @@ eval (EBreak l e) = do
 eval (EFunc f) = return (VFun f)
 eval call@(ECall (EVar "print") es) = do
   vs <- mapM eval es
-  mapM (lift . lift . lift . print . show) vs
+  let line = (intercalate " " . map show) vs
+  appendToOutput line
+  appendToOutput "\n"
   return VNone
 eval call@(ECall e es) = do
   v <- eval e
