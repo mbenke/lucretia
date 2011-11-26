@@ -1,0 +1,14 @@
+Name:		lucre
+Version:	0.1
+Author:		Marcin Benke
+Build-Type:	Simple
+Cabal-Version:  >=1.2
+
+executable lucre
+  build-depends: 
+    base >= 4,
+    containers,
+    mtl >= 1.1,
+    parsec >=3
+  main-is: lucre.hs
+

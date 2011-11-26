@@ -3,8 +3,8 @@ import Lucretia.Interpreter
 -- import qualified Lucretia.ParsecParser as Parser
 import qualified Lucretia.ApplicativeParser as Parser
 
-import IO ( stdin, hGetContents )
-import System ( getArgs, getProgName )
+import System.IO ( stdin, hGetContents )
+import System.Environment ( getArgs, getProgName )
 
 main = do args <- getArgs
           case args of
