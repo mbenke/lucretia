@@ -10,8 +10,6 @@ import Control.Monad.Identity
 import Lucretia.TypeChecker.Syntax
 import Lucretia.TypeChecker.Types
 
-import PrettyDecodablePrint
-
 
 emptyEnv :: Env
 emptyEnv = Map.empty
