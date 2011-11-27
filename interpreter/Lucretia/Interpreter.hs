@@ -39,7 +39,7 @@ runProgGetOutput p =
         Left exc -> "Exception: "++show exc++"\n"
         Right _ -> ""
 
---TODO refactor: rename to: runLuProgamPrintingDebugInfo
+--TODO refactor: rename to: runLuProgramPrintingDebugInfo
 runProg :: Defs -> IO (Val, String)
 runProg p = do
   let res = runIM (evalDefs p) initState

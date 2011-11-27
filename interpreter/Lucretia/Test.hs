@@ -203,8 +203,8 @@ prog8 = expr func1
 text8 = "func(x) x"
 -- expect 42
 prog9 = expr $ ECall func1 [EInt 42]
---text9 = "i=func(x)x;i(42)"
-text9 = "(func(x)x)(42)"
+text9 = "i=func(x)x;i(42)"
+--text9 = "(func(x)x)(42)"
 
 -- expect error
 prog10 = expr $ ECall func1 [EInt 42,EInt 1]
