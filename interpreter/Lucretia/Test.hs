@@ -1,16 +1,117 @@
-module Lucretia.Test(test, testParser) where
+module Lucretia.Test(main, tests) where
 import Lucretia.Syntax
 import Lucretia.Interpreter
 -- import qualified Lucretia.ParsecParser as Parser
 import qualified Lucretia.ApplicativeParser as Parser
 
 import Control.Monad.Error
+import Test.HUnit
+import HUnitUtils(assertEqualShowingDiff, assertIsInfixOf)
+
+luProgramTester :: ProgramText -> CompareResultStrategy -> Test
+
+main = runTestTT $ TestList $ tests
+
+tests :: [Test]
+tests = exampleTests++byValueTests++throwingErrorTests ++ fromFileTests
+
+exampleTests :: [Test]
+exampleTests = [
+{- to show how diff is printed when outputs don't match:
+  luProgramTester 
+    "print(4242)"
+    (expectThisOutput "4241\n")
+  ,
+-}
+  luProgramTester 
+    "print(4242)"
+    (expectThisOutput "4242\n")
+  ,
+  luProgramTester 
+    "print(4242)"
+    (expectThisValue VNone)
+  ,
+  print42Tester $ expectThisOutput "4242\n",
+  print42Tester $ expectThisValue VNone
+  ]
+
+print42Tester :: CompareResultStrategy -> Test
+print42Tester = luProgramTester "print(4242)"
+
+type LuProgramResult = (Val, String)
+type CompareResultStrategy = LuProgramResult -> Assertion
+type ProgramText = String
+
+expectThisOutput :: String -> CompareResultStrategy
+expectThisOutput expectedOutput (actualValue, actualOutput) =
+  assertEqualShowingDiff "" expectedOutput actualOutput
+
+expectThisValue :: Val -> CompareResultStrategy
+expectThisValue expectedOutput (actualValue, actualOutput) =
+  assertEqual "" expectedOutput actualValue
+
+expectError :: CompareResultStrategy
+expectError (actualValue, actualOutput) = do
+  assertEqual "" actualValue VNone
+  assertIsInfixOf "" "Error:" actualOutput
+
+--withFile :: FilePath -> GetProgramTextStrategy
+--withFile fileName = (fileName, readFile fileName)
+
+luProgramTester fileContents compareOutputStrategy =
+  TestCase $ do
+    putStrLn ""
+    case Parser.runParser "NotNecassarilyAFile (TODO:change runParser signature)" fileContents of
+      Left error -> putStr "Parse error: " >> print error
+      Right program ->  do
+        putStrLn $ "Parsed OK: " ++ show program
+        runProg program >>= compareOutputStrategy
+    putStrLn ""
+
+
+
+byValueTestsData = [
+  (text7, VInt 1),
+  (text8, VFun $ Func ["x"] $ EVar "x"),
+  (text9, VInt 42),
+  (text12, VNone)
+  ]
+
+byValueTests :: [Test]
+byValueTests = map mapToATest byValueTestsData
+  where mapToATest (programText, expectedResult) =
+          luProgramTester programText (expectThisValue expectedResult)
+
+throwingErrorTestsData = [text10, text11]
+
+throwingErrorTests :: [Test]
+throwingErrorTests = map mapToATest throwingErrorTestsData
+  where mapToATest programText = luProgramTester programText expectError
+
+
+fromFileTests :: [Test]
+fromFileTests = [compareInterpretedLuProgramWithOutputFile "TestByLuOutput/print.lu" "TestByLuOutput/print.lu.out"]
+--TODO open all files in the directory
+
+compareInterpretedLuProgramWithOutputFile :: FilePath -> FilePath -> Test
+compareInterpretedLuProgramWithOutputFile programFilePath outputFilePath =
+  TestCase $ do
+    programText    <- readFile programFilePath
+    expectedOutput <- readFile outputFilePath
+    let (TestCase test) = luProgramTester programText (expectThisOutput expectedOutput)
+    test
+{-
+TODO: Migrate the old tests below to the new way of testing.
+  This would require either
+    - translating ASTs (progN) to text (textN), or
+    - adding possibility for testing programs by their ASTs to the new way of testing.
+-}
 
 derefVar :: Name -> Exp
 derefVar = EDeref . EVar
 
-test :: IO ()
-test = do
+testParserAndInterpreter :: IO ()
+testParserAndInterpreter = do
   testException
   putStrLn "  .../prog2"
   runProg prog2
@@ -27,23 +128,6 @@ test = do
   putStrLn ".../prog6, expect Break \"foo\""
   runProg prog6 
   putStrLn ".../prog7, expect 1"
-  -- runProg prog7 
-  testParser "text7" text7
-  putStrLn "\n.../prog8, expect identity fun"
-  -- runProg prog8
-  testParser "text8" text8
-  putStrLn "\n.../prog9, expect 42"  
-  -- runProg prog9
-  testParser "text9" text9
-  putStrLn "\n.../prog10, expect error: too many args"
-  -- runProg prog10
-  testParser "text10" text10
-  putStrLn "\n.../prog11, expect error: not enough args"
-  -- runProg prog11  
-  testParser "text11" text11
-  putStrLn "\n.../prog12, expect 4242"
-  -- runProg prog12  
-  testParser "text12" text12
 
 
 testIM :: IM () -> IO ()
@@ -69,12 +153,7 @@ testException = do
   putStrLn "Expect ()"
   testIM $
     (throwError "this error should be caught") `catchError` (\s->return ())
-    
-testParser name text = case Parser.runParser name text of
-  Left e -> putStr "Parse error: " >> print e
-  Right p ->  do
-    putStrLn $ "Parsed OK: " ++ show p
-    runProg p
+
 
 prog2 :: Defs
 prog2 = [
@@ -102,6 +181,11 @@ text4 = "locals = new {}; \
 \ if locals.y then locals.y = 42 else locals.y = None;\ 
 \ locals.y"
 
+{- end of TODO -}
+
+
+
+
 expr :: Exp -> Defs
 expr e = [("_",e)]
 
@@ -119,8 +203,8 @@ prog8 = expr func1
 text8 = "func(x) x"
 -- expect 42
 prog9 = expr $ ECall func1 [EInt 42]
---text9 = "i=func(x)x;i(42)"
-text9 = "(func(x)x)(42)"
+text9 = "i=func(x)x;i(42)"
+--text9 = "(func(x)x)(42)"
 
 -- expect error
 prog10 = expr $ ECall func1 [EInt 42,EInt 1]

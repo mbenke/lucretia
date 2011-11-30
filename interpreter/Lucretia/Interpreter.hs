@@ -39,16 +39,18 @@ runProgGetOutput p =
         Left exc -> "Exception: "++show exc++"\n"
         Right _ -> ""
 
-runProg :: Defs -> IO ()
+--TODO refactor: rename to: runLuProgramPrintingDebugInfo
+runProg :: Defs -> IO (Val, String)
 runProg p = do
   let res = runIM (evalDefs p) initState
   case res of
-    Left e -> putStrLn ("Error: "++e)
+    Left e -> return $ (VNone, "Error: "++e++"\n")
     Right (a,state) -> do
-      case a of
-        Left exc -> putStrLn ("Exception: "++show exc)
-        Right ok -> putStrLn ("OK: "++show ok)
       printState state      
+      return $ 
+        case a of
+          Left exc -> (VNone, output state++"Exception: "++show exc++"\n")
+          Right ok -> (ok, output state)
 
     
 printState :: IntState -> IO ()
