@@ -9,7 +9,10 @@ type Param = Name
 -- TODO
 -- full Exp tree
 data Exp 
-  = EVar Name
+  = EInt Integer
+  | EBoolTrue
+  | EBoolFalse
+  | EVar Name
   | ENew
   | ELet Name Exp Exp
   | ELets Defs Exp
