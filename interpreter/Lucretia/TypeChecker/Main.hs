@@ -65,10 +65,7 @@ extendRecordConstraint :: Name -> Name -> Type -> CM()
 extendRecordConstraint r a t = modifyConstraints $ extendRecordConstraint' r a t
 
 extendRecordConstraint' :: Name -> Name -> Type -> ModifyConstraints
-extendRecordConstraint' recordName attribute t = Map.adjust (\(TRec record) -> TRec $ addAttribute attribute t record) recordName
---TODO are all Constraints of type: "variable <# RecType"
---so maybe we can use it instead of "variable <# Type" 
---to avoid unpacking like in "(TRec record)"
+extendRecordConstraint' recordName attribute t = Map.adjust (addAttribute attribute t) recordName
 
 addAttribute :: Name -> Type -> RecType -> RecType
 addAttribute = Map.insert
@@ -78,8 +75,8 @@ addAttribute = Map.insert
 
 freshTVar = freshName "X"
 
-emptyRecType :: Type
-emptyRecType = TRec Map.empty
+emptyRecType :: RecType
+emptyRecType = Map.empty
 
 envType :: Env -> Name -> CM Type
 envType env x = case Map.lookup x env of
@@ -111,17 +108,25 @@ findType env (ESet x a e) = do
   extendRecordConstraint tX a t2
   return (TVar tX)
 
-  
-
 {-
 -- TODO uncomment, make run
-
 findType env (EGet x a) = do
   tX <- envType env x
-  --TODO refactor: catch mathing exception
   case tX of
-    TRec      -> do
+    TRec t     -> do
+      guard $ doesNotHaveBottom u
+
+doesNotHaveBottom :: Type -> Bool
+doesNotHaveBottom TInt = True
+doesNotHaveBottom TBool = True
+doesNotHaveBottom TVar _ = True
+doesNotHaveBottom TRec _ = True
+doesNotHaveBottom TOr t1 t2 = doesNotHaveBottom t1 && doesNotHaveBottom t2
+doesNotHaveBottom TFieldUndefined = False
+    --TOr ts -> TOr mapMonad ts
       
+
+-- TODO uncomment, make run
     otherwise -> throwError $ x ++ " should be of an object type, but is " ++ show tX ++ "\n" ++ "  In the expression " ++ show (EGet x a) --showPretty
 
 
@@ -129,7 +134,6 @@ findType env (EGet x a) = do
   --zamiana na mapę
   --TODO map constraints
 
-  --guard $ doesNotHaveBottom u
 
 
 envType :: Env -> Name -> CM Type
@@ -152,22 +156,44 @@ findType env (EIf eIf eThen eElse) = do
   stateAfterElse <- get
 
   put $ mergeStates stateAfterThen stateAfterElse
-  return $ TOr tThen tElse --TODO 1. tego nie ma w regułach 2. czemu dwa rozne TOr w papierze?
-
-getTOr :: Type -> Type -> Type
-getTOr t1 t2
-  | t1 == t2  = t1
-  | otherwise = TOr t1 t2
+  return $ mergeTypes tThen tElse
 
 mergeStates :: CheckState -> CheckState -> CheckState
 mergeStates cst1 cst2 = CheckState (mergeCons (cstCons cst1) (cstCons cst2))
                                    (mergeFresh (cstFresh cst1) (cstFresh cst2))
 
 mergeCons :: Constraints -> Constraints -> Constraints
-mergeCons cons1 cons2 = cons1 --TODO
+mergeCons = Map.unionWith mergeRecTypes
+
+mergeRecTypes :: RecType -> RecType -> RecType
+mergeRecTypes r1 r2 = 
+  Map.union intersection rest
+    where
+    intersection = Map.intersectionWith mergeTypes r1 r2
+    rest = Map.map canBeUndefined r1_xor_r2
+      where canBeUndefined (TOr ts) = TOr (TFieldUndefined:ts)
+            canBeUndefined t = TOr [TFieldUndefined, t] 
+    r1_xor_r2 = Map.union (Map.difference r1 r2) (Map.difference r2 r1)
+
+mergeTypes :: Type -> Type -> Type
+mergeTypes t1 t2
+  | t1 == t2  = t1
+  | otherwise = mergeInequalTypes t1 t2
+  where
+  mergeInequalTypes :: Type -> Type -> Type
+  mergeInequalTypes (TOr t1) (TOr t2) = TOr $ t1 ++ t2
+  mergeInequalTypes t1 (TOr t2) = 
+    if t1 `elem` t2
+      then TOr t2
+      else TOr $ t1:t2
+  mergeInequalTypes (TOr t1) t2 =
+    if t2 `elem` t1
+      then TOr t1
+      else TOr $ t2:t1
+  mergeInequalTypes t1 t2 = TOr [t1, t2]
 
 mergeFresh :: [Int] -> [Int] -> [Int]
 mergeFresh (fresh1:_) (fresh2:_) = [(max fresh1 fresh2)..]
   
-oneFieldTRec :: Name -> Type -> Type
-oneFieldTRec a t = TRec $ Map.fromList [(a,t)]
+oneFieldTRec :: Name -> Type -> RecType
+oneFieldTRec a t = Map.fromList [(a,t)]

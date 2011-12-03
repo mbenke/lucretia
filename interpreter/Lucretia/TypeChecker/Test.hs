@@ -19,7 +19,9 @@ outputTypeTestsData = [
   (ENew, "Right (X1,[X1 < {}])"),
   (ELet "foo" ENew (EVar "foo"), "Right (X1,[X1 < {}])"),
   (oneFieldRecord, "Right (X1,[X1 < {a:int}])"),
-  (recordWithManyFields, "Right (X1,[X1 < {a:int, b:int, c:int}])")
+  (recordWithManyFields, "Right (X1,[X1 < {a:int, b:int, c:int}])"),
+  (eIfTOr, "Right (X1,[X1 < {a:int v bool}])"),
+  (eIfTFieldUndefined, "Right (X1,[X1 < {a:undefined v int, b:undefined v bool}])")
   ]
 
 outputTypeTests :: [Test]
@@ -52,37 +54,23 @@ recordWithManyFields =
   ELet "_" (ESet "foo" "c" $ EInt 42) $
   EVar "foo"
 
-typeOrExampleReturnFooA :: Exp
-typeOrExampleReturnFooA =
-  typeOrExample $
-  EGet "foo" "a"
-
-typeOrExample :: Exp -> Exp
-typeOrExample returnExp = 
+eIfTOr :: Exp
+eIfTOr = 
   ELet "foo" ENew $
   ELet "_"
   (EIf (EBoolTrue)
     (ESet "foo" "a" $ EInt 42)
     (ESet "foo" "a" $ EBoolTrue)
   ) $
-  returnExp
-
-typeFieldUndefinedExampleReturnFoo =
-  typeFieldUndefinedExample $ 
   EVar "foo"
 
-typeFieldUndefinedExampleTypeError =
-  typeFieldUndefinedExample $ 
-  EGet "foo" "a"
-
-typeFieldUndefinedExample :: Exp -> Exp
-typeFieldUndefinedExample returnExp = 
+eIfTFieldUndefined :: Exp
+eIfTFieldUndefined = 
   ELet "foo" ENew $
   ELet "_"
   (EIf (EBoolTrue)
     (ESet "foo" "a" $ EInt 42)
     (ESet "foo" "b" $ EBoolTrue)
   ) $
-  returnExp
-
+  EVar "foo"
 
