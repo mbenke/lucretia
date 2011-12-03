@@ -29,12 +29,12 @@ instance Show CheckState where
 showConstraints cs = concat ["[",showFields fields,"]"] where
   fields = Map.toList cs
   showFields fields = intercalate ", " (map showField fields)
-  showField (l,t) = concat [l,"<",show t]
+  showField (l,t) = concat [l," < ",show t]
   
 showRec :: RecType -> String 
 showRec r = concat ["{",showFields fields,"}"] where
   fields = Map.toList r 
-  showFields = concatMap showField
+  showFields fields = intercalate ", " (map showField fields)
   showField (l,t) = concat [l,":",show t]
   
 instance Show Type where

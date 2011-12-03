@@ -47,12 +47,35 @@ freshName s = do
   i <- freshInt
   return $ s ++ show i
 
-addConstraint :: Name -> Type -> CM ()
-addConstraint n t = do
-  cst <- get
-  put $ cst { cstCons = Map.insert n t (cstCons cst) }
-  --TODO refactor
-  
+
+
+
+type ModifyConstraints = Constraints -> Constraints
+
+modifyConstraints :: ModifyConstraints -> CM()
+modifyConstraints f = modify $ \cst -> cst { cstCons = f (cstCons cst) }
+
+createEmptyConstraint :: Name -> CM ()
+createEmptyConstraint = modifyConstraints . createEmptyConstraint'
+
+createEmptyConstraint' :: Name -> ModifyConstraints
+createEmptyConstraint' record = Map.insert record emptyRecType
+
+extendRecordConstraint :: Name -> Name -> Type -> CM()
+extendRecordConstraint r a t = modifyConstraints $ extendRecordConstraint' r a t
+
+extendRecordConstraint' :: Name -> Name -> Type -> ModifyConstraints
+extendRecordConstraint' recordName attribute t = Map.adjust (\(TRec record) -> TRec $ addAttribute attribute t record) recordName
+--TODO are all Constraints of type: "variable <# RecType"
+--so maybe we can use it instead of "variable <# Type" 
+--to avoid unpacking like in "(TRec record)"
+
+addAttribute :: Name -> Type -> RecType -> RecType
+addAttribute = Map.insert
+
+
+
+
 freshTVar = freshName "X"
 
 emptyRecType :: Type
@@ -74,7 +97,7 @@ findType env EBoolTrue = return TBool
 findType env EBoolFalse = return TBool
 findType env ENew = do
   t <- freshTVar
-  addConstraint t emptyRecType
+  createEmptyConstraint t
   return $ TVar t
 findType env (ELet x e1 e0) = do  
   t1 <- findType env e1
@@ -85,7 +108,7 @@ findType env (ELets ((x,e):ds) e0) = findType env (ELet x e (ELets ds e0))
 findType env (ESet x a e) = do
   TVar tX <- envType env x
   t2 <- findType env e
-  addConstraint tX $ oneFieldTRec a t2
+  extendRecordConstraint tX a t2
   return (TVar tX)
 
   
