@@ -13,8 +13,8 @@ data Type
   = TInt
   | TBool
   | TVar Name
-  | TRec RecType --TODOremove
-  | TOr [Type]
+  | TRec RecType --TODO remove
+  | TOr [Type] --TODO [Type] ~> Set Type
   | TFieldUndefined
   | TFunc [Type] CheckState [Type] CheckState
   deriving Eq
