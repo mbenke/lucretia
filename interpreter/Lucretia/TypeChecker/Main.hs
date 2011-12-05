@@ -7,8 +7,11 @@ import Control.Monad.Error
 import Control.Monad.State
 import Control.Monad.Identity
 
-import Lucretia.TypeChecker.Syntax
+import Debug(debugPrint, debugPrintList)
+
+import Lucretia.TypeChecker.Definitions(Name, Param)
 import Lucretia.TypeChecker.Types
+import Lucretia.TypeChecker.Syntax
 
 
 emptyEnv :: Env
@@ -158,6 +161,31 @@ findType env (EIf eIf eThen eElse) = do
   put $ mergeStates stateAfterThen stateAfterElse
   return $ mergeTypes tThen tElse
 
+findType env (EFunc (Func eParams tExpected eBody)) = do
+  let TFunc expectedConstraintsBefore tParams tBody expectedConstraintsAfter = tExpected
+  let params = zip eParams tParams
+  let extendedEnv = foldl (\envAccumulator (eXi, tXi) -> Map.insert eXi tXi envAccumulator) env params
+
+  constraintsBeforeBody <- getConstraints
+
+  putConstraints expectedConstraintsBefore
+  u <- findType extendedEnv eBody
+  constraintsAfterActual <- getConstraints
+  guard $ expectedConstraintsAfter == constraintsAfterActual
+
+  putConstraints constraintsBeforeBody
+  return tExpected
+
+getConstraints :: CM Constraints
+getConstraints = do
+  state <- get
+  return $ cstCons state
+
+putConstraints :: Constraints -> CM ()
+putConstraints constraints = do
+  state <- get
+  put $ state { cstCons = constraints }
+  
 mergeStates :: CheckState -> CheckState -> CheckState
 mergeStates cst1 cst2 = CheckState (mergeCons (cstCons cst1) (cstCons cst2))
                                    (mergeFresh (cstFresh cst1) (cstFresh cst2))
@@ -195,5 +223,7 @@ mergeTypes t1 t2
 mergeFresh :: [Int] -> [Int] -> [Int]
 mergeFresh (fresh1:_) (fresh2:_) = [(max fresh1 fresh2)..]
   
-oneFieldTRec :: Name -> Type -> RecType
-oneFieldTRec a t = Map.fromList [(a,t)]
+
+
+
+

@@ -2,6 +2,8 @@
 module Lucretia.TypeChecker.Test where
 
 import Test.HUnit
+import Data.Map(Map)
+import qualified Data.Map as Map
 
 import HUnitUtils(assertEqualShowingDiff)
 
@@ -21,7 +23,9 @@ outputTypeTestsData = [
   (oneFieldRecord, "Right (X1,[X1 < {a:int}])"),
   (recordWithManyFields, "Right (X1,[X1 < {a:int, b:int, c:int}])"),
   (eIfTOr, "Right (X1,[X1 < {a:int v bool}])"),
-  (eIfTFieldUndefined, "Right (X1,[X1 < {a:undefined v int, b:undefined v bool}])")
+  (eIfTFieldUndefined, "Right (X1,[X1 < {a:undefined v int, b:undefined v bool}])"),
+  (eFunc, "Right (([] bool int -> bool []),[])"),
+  (eFuncWithConstraints, "Right (([] bool int -> bool [X1 < {a:int}]),[])")
   ]
 
 outputTypeTests :: [Test]
@@ -74,3 +78,18 @@ eIfTFieldUndefined =
   ) $
   EVar "foo"
 
+eFunc :: Exp
+eFunc =
+  EFunc (Func 
+    ["x1", "x2"]
+    (TFunc (Map.fromList []) [TBool, TInt] TBool (Map.fromList []))
+    (EVar "x1")
+  )
+
+eFuncWithConstraints :: Exp
+eFuncWithConstraints =
+  EFunc (Func 
+    ["x1", "x2"]
+    (TFunc (Map.fromList []) [TBool, TInt] TBool (Map.fromList [("X1", oneFieldTRec "a" TInt)]))
+    oneFieldRecord
+  )

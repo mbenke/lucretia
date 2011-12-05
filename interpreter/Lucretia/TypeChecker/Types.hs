@@ -7,7 +7,7 @@ import Data.List(intercalate)
 import Data.Map(Map)
 import qualified Data.Map as Map
 
-import Lucretia.TypeChecker.Syntax
+import Lucretia.TypeChecker.Definitions(Name, Param)
 
 data Type
   = TInt
@@ -16,7 +16,7 @@ data Type
   | TRec RecType --TODO remove
   | TOr [Type] --TODO [Type] ~> Set Type
   | TFieldUndefined
-  | TFunc [Type] CheckState [Type] CheckState
+  | TFunc Constraints [Type] Type Constraints
   deriving Eq
 type RecType = Map Name Type
 type Constraints = Map Name RecType
@@ -50,4 +50,9 @@ instance Show Type where
   show (TRec r) = showRec r
   show (TOr ts) = intercalate " v " (map show ts)
   show (TFieldUndefined) = "undefined"
+  show (TFunc constraintsBefore paramTypes bodyType constraintsAfter) = "(" ++ showConstraints constraintsBefore ++ " " ++ intercalate " " (map show paramTypes) ++ " -> " ++ show bodyType ++ " " ++ showConstraints constraintsAfter ++ ")"
 
+
+
+oneFieldTRec :: Name -> Type -> RecType
+oneFieldTRec a t = Map.fromList [(a,t)]

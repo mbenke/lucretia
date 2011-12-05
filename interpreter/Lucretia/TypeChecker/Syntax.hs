@@ -1,10 +1,11 @@
 module Lucretia.TypeChecker.Syntax where
 
-type Name = String
+import Lucretia.TypeChecker.Types
+import Lucretia.TypeChecker.Definitions(Name, Param)
+
 type Program = Defs
 type Defs = [Def]
 type Def = (Name,Exp)
-type Param = Name
 
 -- now this file is almost the same as Lucretia.Syntax
 -- TODO eliminate differences
@@ -19,8 +20,8 @@ data Exp
     | ELet Name Exp Exp
     | ELets Defs Exp
     | EIf Exp Exp Exp
-    | ENew
 --    | ENew Exp
+    | ENew
 
     | EGet Name Name
     | ESet Name Name Exp
@@ -36,7 +37,8 @@ data Exp
 
       deriving (Eq,Show)
 
-data Func = Func [Param] Exp deriving (Eq,Show)
+--data Func = Func [Param] Exp deriving (Eq,Show)
+data Func = Func [Param] Type Exp deriving (Eq,Show)
 
 instance Num Exp where
     fromInteger = EInt
