@@ -71,6 +71,8 @@ luProgramTester fileContents compareOutputStrategy =
 
 
 byValueTestsData = [
+  (text2, VInt 1),
+  (text4, VNone),
   (text7, VInt 1),
   (text8, VFun $ Func ["x"] $ EVar "x"),
   (text9, VInt 42),

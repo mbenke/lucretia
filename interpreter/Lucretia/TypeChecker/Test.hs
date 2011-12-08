@@ -2,12 +2,41 @@
 module Lucretia.TypeChecker.Test where
 
 import Test.HUnit
+import Data.Map(Map)
+import qualified Data.Map as Map
 
 import HUnitUtils(assertEqualShowingDiff)
 
 import Lucretia.TypeChecker.Main(checkProg, runCheck)
 import Lucretia.TypeChecker.Syntax
 import Lucretia.TypeChecker.Types
+
+tests :: [Test]
+tests = outputTypeTests
+
+
+outputTypeTestsData :: [(Exp, String)]
+outputTypeTestsData = [
+  (eInt, "Right (int,[])"),
+  (ENew, "Right (X1,[X1 < {}])"),
+  (ELet "foo" ENew (EVar "foo"), "Right (X1,[X1 < {}])"),
+  (oneFieldRecord, "Right (X1,[X1 < {a:int}])"),
+  (recordWithManyFields, "Right (X1,[X1 < {a:int, b:int, c:int}])"),
+  (eIfTOr, "Right (X1,[X1 < {a:int v bool}])"),
+  (eIfTFieldUndefined, "Right (X1,[X1 < {a:undefined v int, b:undefined v bool}])"),
+  (eFunc, "Right (([] bool int -> bool []),[])"),
+  (eFuncWithConstraints, "Right (([] bool int -> bool [X1 < {a:int}]),[])")
+  ]
+
+outputTypeTests :: [Test]
+outputTypeTests = map (uncurry mapToATest) outputTypeTestsData
+ where 
+  mapToATest :: Exp -> String -> Test
+  mapToATest e expectedType = TestCase $ assertEqualShowingDiff
+    ("For program " ++ show e ++ ":")
+    expectedType
+    (show $ runCheck e)
+
 
 eInt :: Exp
 eInt = EInt 42
@@ -21,69 +50,46 @@ oneFieldRecord =
   ELet "foo" ENew $
   (ESet "foo" "a" $ EInt 42)
 
-typeOrExampleReturnFooA :: Exp
-typeOrExampleReturnFooA =
-  typeOrExample $
-  EGet "foo" "a"
+recordWithManyFields :: Exp
+recordWithManyFields = 
+  ELet "foo" ENew $
+  ELet "_" (ESet "foo" "a" $ EInt 42) $
+  ELet "_" (ESet "foo" "b" $ EInt 42) $
+  ELet "_" (ESet "foo" "c" $ EInt 42) $
+  EVar "foo"
 
-typeOrExample :: Exp -> Exp
-typeOrExample returnExp = 
+eIfTOr :: Exp
+eIfTOr = 
   ELet "foo" ENew $
   ELet "_"
   (EIf (EBoolTrue)
     (ESet "foo" "a" $ EInt 42)
     (ESet "foo" "a" $ EBoolTrue)
   ) $
-  returnExp
-
-typeFieldUndefinedExampleReturnFoo =
-  typeFieldUndefinedExample $ 
   EVar "foo"
 
-typeFieldUndefinedExampleTypeError =
-  typeFieldUndefinedExample $ 
-  EGet "foo" "a"
-
-typeFieldUndefinedExample :: Exp -> Exp
-typeFieldUndefinedExample returnExp = 
+eIfTFieldUndefined :: Exp
+eIfTFieldUndefined = 
   ELet "foo" ENew $
   ELet "_"
   (EIf (EBoolTrue)
     (ESet "foo" "a" $ EInt 42)
     (ESet "foo" "b" $ EBoolTrue)
   ) $
-  returnExp
+  EVar "foo"
 
+eFunc :: Exp
+eFunc =
+  EFunc (Func 
+    ["x1", "x2"]
+    (TFunc (Map.fromList []) [TBool, TInt] TBool (Map.fromList []))
+    (EVar "x1")
+  )
 
-tests :: [Test]
-tests = typeableTests ++ outputTypeTests
-
-typeableTestsData :: [Exp]
-typeableTestsData = [eInt, eBoolTrue, eBoolFalse, oneFieldRecord]
-typeableTests :: [Test]
-typeableTests = map mapToATest typeableTestsData
-  where mapToATest = programIsTypeable . programFromExp
-
-programIsTypeable :: Program -> Test
-programIsTypeable p = TestCase $ assertBool
-  ("Program " ++ show p ++ " should be typeable")
-  (checkProg p)
-
-
-outputTypeTestsData :: [(Exp, String)]
-outputTypeTestsData = [
-  (eInt, "Right (int,[])"),
-  (ENew, "Right (X1,[X1<{}])"),
-  (ELet "foo" ENew (EVar "foo"), "Right (X1,[X1<{}])"),
-  (oneFieldRecord, "Right (X1,[X1<{a:int}])")
-  ]
-outputTypeTests :: [Test]
-outputTypeTests = map mapToATest outputTypeTestsData
-  where mapToATest (e, s) = outputTypeMatches e s
-
-outputTypeMatches :: Exp -> String -> Test
-outputTypeMatches e expectedType = TestCase $ assertEqualShowingDiff
-  ("For program " ++ show e ++ ":")
-  expectedType
-  (show $ runCheck e)
-
+eFuncWithConstraints :: Exp
+eFuncWithConstraints =
+  EFunc (Func 
+    ["x1", "x2"]
+    (TFunc (Map.fromList []) [TBool, TInt] TBool (Map.fromList [("X1", oneFieldTRec "a" TInt)]))
+    oneFieldRecord
+  )
