@@ -25,7 +25,12 @@ outputTypeTestsData = [
   (eIfTOr, "Right (X1,[X1 < {a:int v bool}])"),
   (eIfTFieldUndefined, "Right (X1,[X1 < {a:undefined v int, b:undefined v bool}])"),
   (eFunc, "Right (([] bool int -> bool []),[])"),
-  (eFuncWithConstraints, "Right (([] bool int -> bool [X1 < {a:int}]),[])")
+  (eFuncWrongReturnType, "Left \"Expected type: int is different than actual type: bool\""),
+  (eFuncWithConstraints, "Right (([] bool int -> X1 [X1 < {a:int}]),[])"),
+  (eFuncWrongNumberOfArguments, "Left \"Number of arguments and number of their types doesn't match\""){-,
+  (eFuncDefiningRecordInsideButNotReturningIt, "Left"),
+  (eLetDefiningRecordInsideButNotReturningIt, "Left")
+  -}
   ]
 
 outputTypeTests :: [Test]
@@ -86,10 +91,39 @@ eFunc =
     (EVar "x1")
   )
 
+eFuncWrongReturnType :: Exp
+eFuncWrongReturnType =
+  EFunc (Func 
+    ["x1", "x2"]
+    (TFunc (Map.fromList []) [TBool, TInt] TInt (Map.fromList []))
+    (EVar "x1")
+  )
+
 eFuncWithConstraints :: Exp
 eFuncWithConstraints =
   EFunc (Func 
     ["x1", "x2"]
-    (TFunc (Map.fromList []) [TBool, TInt] TBool (Map.fromList [("X1", oneFieldTRec "a" TInt)]))
+    (TFunc (Map.fromList []) [TBool, TInt] (TVar "X1") (Map.fromList [("X1", oneFieldTRec "a" TInt)]))
     oneFieldRecord
   )
+	
+eFuncWrongNumberOfArguments :: Exp
+eFuncWrongNumberOfArguments =
+  EFunc (Func 
+    ["x1", "x2"]
+    (TFunc (Map.fromList []) [TBool] TBool (Map.fromList [("X1", oneFieldTRec "a" TInt)]))
+    oneFieldRecord
+  )
+
+eFuncDefiningRecordInsideButNotReturningIt :: Exp
+eFuncDefiningRecordInsideButNotReturningIt =
+  EFunc (Func 
+    ["x1", "x2"]
+    (TFunc (Map.fromList []) [TBool, TInt] TBool (Map.fromList [("X1", oneFieldTRec "a" TInt)])) $
+    eLetDefiningRecordInsideButNotReturningIt
+  )
+
+eLetDefiningRecordInsideButNotReturningIt :: Exp
+eLetDefiningRecordInsideButNotReturningIt =
+  ELet "_" oneFieldRecord (EBoolTrue)
+

@@ -7,7 +7,7 @@ import Control.Monad.Error
 import Control.Monad.State
 import Control.Monad.Identity
 
-import Debug(debugPrint, debugPrintList)
+import DebugUtils(traceShowId, traceShowIdHl)
 
 import Lucretia.TypeChecker.Definitions(Name, Param)
 import Lucretia.TypeChecker.Types
@@ -163,18 +163,24 @@ findType env (EIf eIf eThen eElse) = do
 
 findType env (EFunc (Func eParams tExpected eBody)) = do
   let TFunc expectedConstraintsBefore tParams tBody expectedConstraintsAfter = tExpected
+  (length eParams == length tParams) `orFail` "Number of arguments and number of their types doesn't match"
   let params = zip eParams tParams
   let extendedEnv = foldl (\envAccumulator (eXi, tXi) -> Map.insert eXi tXi envAccumulator) env params
-
   constraintsBeforeBody <- getConstraints
 
   putConstraints expectedConstraintsBefore
   u <- findType extendedEnv eBody
+  (tBody == u) `orFail` ("Expected type: " ++ show tBody ++ " is different than actual type: " ++ show u)
   constraintsAfterActual <- getConstraints
-  guard $ expectedConstraintsAfter == constraintsAfterActual
+  (expectedConstraintsAfter == constraintsAfterActual) `orFail` "Constraints after type-checking method body are not the same as declared in the signature."
 
   putConstraints constraintsBeforeBody
+
   return tExpected
+
+orFail :: MonadError e m => Bool -> e -> m ()
+orFail cond errorMsg =
+  unless cond $ throwError errorMsg
 
 getConstraints :: CM Constraints
 getConstraints = do
