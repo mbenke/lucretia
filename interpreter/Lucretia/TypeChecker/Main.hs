@@ -161,23 +161,57 @@ findType env (EIf eIf eThen eElse) = do
   put $ mergeStates stateAfterThen stateAfterElse
   return $ mergeTypes tThen tElse
 
-findType env (EFunc (Func eParams tExpected eBody)) = do
-  let TFunc expectedConstraintsBefore tParams tBody expectedConstraintsAfter = tExpected
-  (length eParams == length tParams) `orFail` "Number of arguments and number of their types doesn't match"
-  let params = zip eParams tParams
+findType env (EFunc (Func xParams tFunc eBody)) = do
+  let TFunc expectedConstraintsBefore tParams tBody expectedConstraintsAfter = tFunc
+  (length xParams == length tParams) `orFail` "Number of arguments and number of their types doesn't match"
+  let params = zip xParams tParams
   let extendedEnv = foldl (\envAccumulator (eXi, tXi) -> Map.insert eXi tXi envAccumulator) env params
   constraintsBeforeBody <- getConstraints
 
   putConstraints expectedConstraintsBefore
   u <- findType extendedEnv eBody
   (tBody == u) `orFail` ("Expected type: " ++ show tBody ++ " is different than actual type: " ++ show u)
-  constraintsAfterActual <- getConstraints
-  (expectedConstraintsAfter == constraintsAfterActual) `orFail` "Constraints after type-checking method body are not the same as declared in the signature."
+  actualConstraintsAfter <- getConstraints
+  (expectedConstraintsAfter == actualConstraintsAfter) `orFail` "Constraints after type-checking method body are not the same as declared in the signature."
+  --TODO maybe this:
+  --(actualConstraintsAfter `areAtLeastThatStrongAs` expectedConstraintsAfter) `orFail` ("Returned value should match at least all the constraints that are declared in the signature of function " ++ funcName ++ ".")
 
   putConstraints constraintsBeforeBody
 
-  return tExpected
+  return tFunc
 
+findType env (ECall eFunc eParams) = do
+  let funcName = findName env eFunc
+
+  tFunc <- findType env eFunc
+  let TFunc expectedConstraintsBefore tParams tBody expectedConstraintsAfter = tFunc
+  (length eParams == length tParams) `orFail` ("Function " ++ funcName ++ " is applied to " ++ show (length eParams) ++ " parameters, but " ++ show (length tParams) ++ " parameters should be provided.")
+  
+  tParamsActual <- mapM (findType env) eParams
+  (tParams == tParamsActual) `orFail` ("Types of parameters should be " ++ show tParams ++ " but are " ++ show tParamsActual ++ ".")
+
+  actualConstraintsBeforeBody <- getConstraints
+  (expectedConstraintsBefore `constraintsAreWeakerOrEqualTo` actualConstraintsBeforeBody) `orFail` ("Constraints before calling function " ++ funcName ++ ": " ++ showConstraints actualConstraintsBeforeBody ++ " are not that strong as pre-constraints in the function definition: " ++ showConstraints expectedConstraintsBefore ++ ".")
+
+  putConstraints $ actualConstraintsBeforeBody `merge` expectedConstraintsAfter
+
+  return tBody
+
+  where
+
+  constraintsAreWeakerOrEqualTo :: Constraints -> Constraints -> Bool
+  constraintsAreWeakerOrEqualTo = Map.isSubmapOfBy recordIsSmallerOrEqualTo
+  
+  recordIsSmallerOrEqualTo :: RecType -> RecType -> Bool
+  recordIsSmallerOrEqualTo = Map.isSubmapOf
+
+  merge :: Constraints -> Constraints -> Constraints
+  merge = Map.unionWith seq
+
+findName :: Env -> Exp -> Name
+findName env (EVar x) = x
+findName env _ = "(anonymous)"
+  
 orFail :: MonadError e m => Bool -> e -> m ()
 orFail cond errorMsg =
   unless cond $ throwError errorMsg
