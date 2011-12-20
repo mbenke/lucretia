@@ -34,6 +34,8 @@ outputTypeTestsData = [
   --(eFuncReturningRecordWithMoreFieldsThanRequiredByConstraintsInFunctionSignature, "Right (([] bool int -> X1 [X1 < {a:int}]),[])"),
   (VARIABLE_NAME(eFuncDefiningRecordInsideButNotReturningIt), "Right (([] bool int -> bool []),[])"),
   (VARIABLE_NAME(eLetDefiningRecordInsideButNotReturningIt), "Right (bool,[])"),
+  (VARIABLE_NAME(eFuncDefiningNestedRecordInsideAndReturningIt), "Right (([] bool int -> X3 [X1 < {a:int}, X3 < {c:X1}]),[])"),
+  (VARIABLE_NAME(eLetDefiningNestedRecordInsideAndReturningIt), "Right (X3,[X1 < {a:int}, X3 < {c:X1}])"),
   (VARIABLE_NAME(eCall), "Right (X1,[X1 < {a:int}])"),
   (VARIABLE_NAME(eCallLet), "Right (X1,[X1 < {a:int}])")
   ]
@@ -131,11 +133,29 @@ eFuncWrongNumberOfArguments =
     eRecordWithOneField
   )
 
+eFuncDefiningNestedRecordInsideAndReturningIt :: Exp
+eFuncDefiningNestedRecordInsideAndReturningIt =
+  EFunc (Func 
+    ["x1", "x2"]
+    (TFunc (Map.empty) [TBool, TInt] (TVar "X3") (Map.fromList [("X1", oneFieldTRec "a" TInt), ("X3", oneFieldTRec "c" (TVar "X1"))])) $
+    eLetDefiningNestedRecordInsideAndReturningIt
+  )
+
+eLetDefiningNestedRecordInsideAndReturningIt :: Exp
+eLetDefiningNestedRecordInsideAndReturningIt =
+  ELet "x" ENew $
+  ELet "_" (ESet "x" "a" $ EInt 42) $
+  ELet "y" ENew $
+  ELet "_" (ESet "y" "b" $ EInt 7) $
+  ELet "z" ENew $
+  ELet "_" (ESet "z" "c" $ EVar "x") $
+    EVar "z"
+
 eFuncDefiningRecordInsideButNotReturningIt :: Exp
 eFuncDefiningRecordInsideButNotReturningIt =
   EFunc (Func 
     ["x1", "x2"]
-    (TFunc (Map.fromList []) [TBool, TInt] TBool (Map.fromList [("X1", oneFieldTRec "a" TInt)])) $
+    (TFunc (Map.empty) [TBool, TInt] TBool (Map.empty)) $
     eLetDefiningRecordInsideButNotReturningIt
   )
 
