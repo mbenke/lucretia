@@ -191,7 +191,7 @@ findType env (EIf eIf eThen eElse) = do
   return $ mergeTypes tThen tElse
 
 findType env (EFunc (Func xParams tFunc eBody)) = do
-  let TFunc expectedConstraintsBefore tParams tBody expectedConstraintsAfter = tFunc
+  let TFunc expectedConstraintsBefore tParams expectedU expectedConstraintsAfter = tFunc
   (length xParams == length tParams) `orFail` "Number of arguments and number of their types doesn't match"
   let params = zip xParams tParams
   let extendedEnv = foldl (\envAccumulator (eXi, tXi) -> Map.insert eXi tXi envAccumulator) env params
@@ -199,15 +199,15 @@ findType env (EFunc (Func xParams tFunc eBody)) = do
 
   putConstraints expectedConstraintsBefore
   u <- findTypeCleanConstraints extendedEnv eBody
-  (tBody == u) `orFail` ("Expected type: " ++ show tBody ++ " is different than actual type: " ++ show u)
   actualConstraintsAfter <- getConstraints
-  (expectedConstraintsAfter == actualConstraintsAfter) `orFail` ("Constraints after type-checking method body: " ++ showConstraints actualConstraintsAfter ++ " are not the same as declared in the signature: " ++ showConstraints expectedConstraintsAfter ++ ".")
+  --(expectedU, expectedConstraintsAfter) `areIsomorphic` (u, actualConstraintsAfter)
+  (TypeIso expectedU expectedConstraintsAfter == TypeIso u actualConstraintsAfter) `orFail` ("Type and associated constraints after type-checking method body: " ++ show u ++ ", " ++ showConstraints actualConstraintsAfter ++ " are not the same as declared in the signature: " ++ show expectedU ++ ", " ++ showConstraints expectedConstraintsAfter ++ ".")
   --TODO maybe this:
   --(actualConstraintsAfter `areAtLeastThatStrongAs` expectedConstraintsAfter) `orFail` ("Returned value should match at least all the constraints that are declared in the signature of function " ++ funcName ++ ".")
 
   putConstraints constraintsBeforeBody
 
-  return tFunc
+  return tFunc --TODO: test eFuncWithUnnecessaryConstraints, tFunc { constraintsAfter = cleanConstraints (Map.fromList [("_", expectedU)] (constraintsAfter tFunc) }
 
 findType env (ECall eFunc eParams) = do
   let funcName = findName env eFunc
