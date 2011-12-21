@@ -1,13 +1,14 @@
 module Lucretia.TypeChecker.Main(runCheck, checkProg) where
 
 import Data.Map(Map)
+import qualified Data.Foldable as Foldable
 import qualified Data.Map as Map
 
 import Control.Monad.Error
 import Control.Monad.State
 import Control.Monad.Identity
 
-import Debug(debugPrint, debugPrintList)
+import DebugUtils(traceShowId, traceShowIdHl)
 
 import Lucretia.TypeChecker.Definitions(Name, Param)
 import Lucretia.TypeChecker.Types
@@ -29,7 +30,7 @@ runCM m st = runIdentity $ runErrorT $ runStateT m st
 
 
 runCheck :: Exp -> Either String (Type, CheckState)
-runCheck e = runCM (findType emptyEnv e) initState 
+runCheck e = runCM (findTypeCleanConstraints emptyEnv e) initState 
 
 checkProg :: Program -> Bool
 checkProg defs = isRight $ runCheck (ELets defs ENew) --ENew could be anything
@@ -55,7 +56,7 @@ freshName s = do
 
 type ModifyConstraints = Constraints -> Constraints
 
-modifyConstraints :: ModifyConstraints -> CM()
+modifyConstraints :: ModifyConstraints -> CM ()
 modifyConstraints f = modify $ \cst -> cst { cstCons = f (cstCons cst) }
 
 createEmptyConstraint :: Name -> CM ()
@@ -88,6 +89,34 @@ envType env x = case Map.lookup x env of
   
 
 
+findTypeCleanConstraints :: Env -> Exp -> CM Type
+findTypeCleanConstraints env e = do
+  returnType <- findType env e
+  modifyConstraints $ cleanConstraints env returnType
+  return returnType
+
+filterTVars :: [Type] -> [Name]
+filterTVars ts = map (\(TVar n) -> n) $ filter isTVar $ ts
+  where
+    isTVar (TVar _) = True
+    isTVar _ = False
+    --TODO refactor: is there a language construct for functions like isTVar?
+
+cleanConstraints :: Env -> Type -> Constraints -> Constraints
+cleanConstraints env returnType inputCs = foldl addConstraintsForName Map.empty tVarsNeededInEnv
+  where
+  tVarsNeededInEnv :: [Name]
+  tVarsNeededInEnv = filterTVars $ returnType:(Map.elems env)
+
+  addConstraintsForName :: Constraints -> Name -> Constraints
+  addConstraintsForName neededCsAcc neededTVarName
+    | neededTVarName `Map.member` neededCsAcc = neededCsAcc
+    | otherwise = foldl addConstraintsForName neededCsAccIncreased tVarsNeededInNeededTVar
+    where
+    neededTVarType = inputCs Map.! neededTVarName 
+    tVarsNeededInNeededTVar = filterTVars $ Map.elems neededTVarType
+    neededCsAccIncreased = Map.insert neededTVarName neededTVarType neededCsAcc
+
 
 
 findType :: Env -> Exp -> CM Type
@@ -100,14 +129,14 @@ findType env ENew = do
   createEmptyConstraint t
   return $ TVar t
 findType env (ELet x e1 e0) = do  
-  t1 <- findType env e1
+  t1 <- findTypeCleanConstraints env e1
   let env' = extendEnv x t1 env
-  findType env' e0
-findType env (ELets [] e0) = findType env e0
-findType env (ELets ((x,e):ds) e0) = findType env (ELet x e (ELets ds e0))
+  findTypeCleanConstraints env' e0
+findType env (ELets [] e0) = findTypeCleanConstraints env e0
+findType env (ELets ((x,e):ds) e0) = findTypeCleanConstraints env (ELet x e (ELets ds e0))
 findType env (ESet x a e) = do
   TVar tX <- envType env x
-  t2 <- findType env e
+  t2 <- findTypeCleanConstraints env e
   extendRecordConstraint tX a t2
   return (TVar tX)
 
@@ -147,34 +176,74 @@ envType env x = case Map.lookup x env of
 -}
 
 findType env (EIf eIf eThen eElse) = do
-  TBool <- findType env eIf
+  TBool <- findTypeCleanConstraints env eIf
   stateBeforeBody <- get
   
   put stateBeforeBody
-  tThen <- findType env eThen
+  tThen <- findTypeCleanConstraints env eThen
   stateAfterThen <- get
   
   put stateBeforeBody
-  tElse <- findType env eElse
+  tElse <- findTypeCleanConstraints env eElse
   stateAfterElse <- get
 
   put $ mergeStates stateAfterThen stateAfterElse
   return $ mergeTypes tThen tElse
 
-findType env (EFunc (Func eParams tExpected eBody)) = do
-  let TFunc expectedConstraintsBefore tParams tBody expectedConstraintsAfter = tExpected
-  let params = zip eParams tParams
+findType env (EFunc (Func xParams tFunc eBody)) = do
+  let TFunc expectedConstraintsBefore tParams expectedU expectedConstraintsAfter = tFunc
+  (length xParams == length tParams) `orFail` "Number of arguments and number of their types doesn't match"
+  let params = zip xParams tParams
   let extendedEnv = foldl (\envAccumulator (eXi, tXi) -> Map.insert eXi tXi envAccumulator) env params
-
   constraintsBeforeBody <- getConstraints
 
   putConstraints expectedConstraintsBefore
-  u <- findType extendedEnv eBody
-  constraintsAfterActual <- getConstraints
-  guard $ expectedConstraintsAfter == constraintsAfterActual
+  u <- findTypeCleanConstraints extendedEnv eBody
+  actualConstraintsAfter <- getConstraints
+  --(expectedU, expectedConstraintsAfter) `areIsomorphic` (u, actualConstraintsAfter)
+  (TypeIso expectedU expectedConstraintsAfter == TypeIso u actualConstraintsAfter) `orFail` ("Type and associated constraints after type-checking method body: " ++ show u ++ ", " ++ showConstraints actualConstraintsAfter ++ " are not the same as declared in the signature: " ++ show expectedU ++ ", " ++ showConstraints expectedConstraintsAfter ++ ".")
+  --TODO maybe this:
+  --(actualConstraintsAfter `areAtLeastThatStrongAs` expectedConstraintsAfter) `orFail` ("Returned value should match at least all the constraints that are declared in the signature of function " ++ funcName ++ ".")
 
   putConstraints constraintsBeforeBody
-  return tExpected
+
+  return tFunc --TODO: test eFuncWithUnnecessaryConstraints, tFunc { constraintsAfter = cleanConstraints (Map.fromList [("_", expectedU)] (constraintsAfter tFunc) }
+
+findType env (ECall eFunc eParams) = do
+  let funcName = findName env eFunc
+
+  tFunc <- findTypeCleanConstraints env eFunc
+  let TFunc expectedConstraintsBefore tParams tBody expectedConstraintsAfter = tFunc
+  (length eParams == length tParams) `orFail` ("Function " ++ funcName ++ " is applied to " ++ show (length eParams) ++ " parameters, but " ++ show (length tParams) ++ " parameters should be provided.")
+  
+  tParamsActual <- mapM (findTypeCleanConstraints env) eParams
+  (tParams == tParamsActual) `orFail` ("Types of parameters should be " ++ show tParams ++ " but are " ++ show tParamsActual ++ ".")
+
+  actualConstraintsBeforeBody <- getConstraints
+  (expectedConstraintsBefore `constraintsAreWeakerOrEqualTo` actualConstraintsBeforeBody) `orFail` ("Constraints before calling function " ++ funcName ++ ": " ++ showConstraints actualConstraintsBeforeBody ++ " are not that strong as pre-constraints in the function definition: " ++ showConstraints expectedConstraintsBefore ++ ".")
+
+  putConstraints $ actualConstraintsBeforeBody `merge` expectedConstraintsAfter
+
+  return tBody
+
+  where
+
+  constraintsAreWeakerOrEqualTo :: Constraints -> Constraints -> Bool
+  constraintsAreWeakerOrEqualTo = Map.isSubmapOfBy recordIsSmallerOrEqualTo
+  
+  recordIsSmallerOrEqualTo :: RecType -> RecType -> Bool
+  recordIsSmallerOrEqualTo = Map.isSubmapOf
+
+  merge :: Constraints -> Constraints -> Constraints
+  merge = Map.unionWith seq
+
+findName :: Env -> Exp -> Name
+findName env (EVar x) = x
+findName env _ = "(anonymous)"
+  
+orFail :: MonadError e m => Bool -> e -> m ()
+orFail cond errorMsg =
+  unless cond $ throwError errorMsg
 
 getConstraints :: CM Constraints
 getConstraints = do
@@ -185,7 +254,7 @@ putConstraints :: Constraints -> CM ()
 putConstraints constraints = do
   state <- get
   put $ state { cstCons = constraints }
-  
+
 mergeStates :: CheckState -> CheckState -> CheckState
 mergeStates cst1 cst2 = CheckState (mergeCons (cstCons cst1) (cstCons cst2))
                                    (mergeFresh (cstFresh cst1) (cstFresh cst2))
