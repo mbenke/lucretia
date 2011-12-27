@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 --module Lucretia.TypeChecker.Test(tests, main) where
 module Lucretia.TypeChecker.Test where
 
@@ -11,28 +12,47 @@ import Lucretia.TypeChecker.Main(checkProg, runCheck)
 import Lucretia.TypeChecker.Syntax
 import Lucretia.TypeChecker.Types
 
+#define VARIABLE_NAME(variable) ("variable", variable)
+
 tests :: [Test]
 tests = outputTypeTests
 
-
-outputTypeTestsData :: [(Exp, String)]
+outputTypeTestsData :: [((String, Exp), String)]
 outputTypeTestsData = [
-  (eInt, "Right (int,[])"),
-  (ENew, "Right (X1,[X1 < {}])"),
-  (ELet "foo" ENew (EVar "foo"), "Right (X1,[X1 < {}])"),
-  (oneFieldRecord, "Right (X1,[X1 < {a:int}])"),
-  (recordWithManyFields, "Right (X1,[X1 < {a:int, b:int, c:int}])"),
-  (eIfTOr, "Right (X1,[X1 < {a:int v bool}])"),
-  (eIfTFieldUndefined, "Right (X1,[X1 < {a:undefined v int, b:undefined v bool}])"),
-  (eFunc, "Right (([] bool int -> bool []),[])"),
-  (eFuncWithConstraints, "Right (([] bool int -> bool [X1 < {a:int}]),[])")
+  (VARIABLE_NAME(eInt), "Right (int,[])"),
+  (VARIABLE_NAME(ENew), "Right (X1,[X1 < {}])"),
+  (VARIABLE_NAME(eLet), "Right (X1,[X1 < {}])"),
+  (VARIABLE_NAME(eRecordWithOneField), "Right (X1,[X1 < {a:int}])"),
+  (VARIABLE_NAME(eRecordWithManyFields), "Right (X1,[X1 < {a:int, b:int, c:int}])"),
+  (VARIABLE_NAME(eIfTOr), "Right (X1,[X1 < {a:int v bool}])"),
+  (VARIABLE_NAME(eIfTFieldUndefined), "Right (X1,[X1 < {a:undefined v int, b:undefined v bool}])"),
+  (VARIABLE_NAME(eFunc), "Right (([] bool int -> bool []),[])"),
+  (VARIABLE_NAME(eFuncWrongReturnType), "Left \"Type and associated constraints after type-checking method body: bool, [] are not the same as declared in the signature: int, [].\""),
+  (VARIABLE_NAME(eFuncWithConstraints), "Right (([] bool int -> X1 [X1 < {a:int}]),[])"),
+  (VARIABLE_NAME(eFuncWrongNumberOfArguments), "Left \"Number of arguments and number of their types doesn't match\""),
+  --maybe this should be ok:
+  --(eFuncReturningRecordWithMoreFieldsThanRequiredByConstraintsInFunctionSignature, "Right (([] bool int -> X1 [X1 < {a:int}]),[])"),
+  (VARIABLE_NAME(eFuncDefiningRecordInsideButNotReturningIt), "Right (([] bool int -> bool []),[])"),
+  (VARIABLE_NAME(eLetDefiningRecordInsideButNotReturningIt), "Right (bool,[])"),
+  (VARIABLE_NAME(eFuncDefiningNestedRecordInsideAndReturningIt), "Right (([] bool int -> X3 [X1 < {a:int}, X3 < {c:X1}]),[])"),
+  (VARIABLE_NAME(eLetDefiningNestedRecordInsideAndReturningIt), "Right (X3,[X1 < {a:int}, X3 < {c:X1}])"),
+  (VARIABLE_NAME(eFuncDefiningNestedRecordInsideAndReturningItHavingDifferentlyNamedConstraintVariables), "Right (([] bool int -> C [A < {a:int}, C < {c:A}]),[])"),
+  (VARIABLE_NAME(eFuncWithUnnecessaryConstraints), "Right (([] bool int -> X1 [X1 < {a:int}]),[])"),
+  (VARIABLE_NAME(eFuncDefiningNestedRecordInsideAndHavingMismatchingConstraintSignature1), "Left \"Type and associated constraints after type-checking method body: X3, [X1 < {a:int}, X3 < {c:X1}] are not the same as declared in the signature: C, [C < {c:int}].\""),
+
+  --TODO test catching error
+  (VARIABLE_NAME(eFuncDefiningNestedRecordInsideAndHavingWrongConstraintSignature), ""),
+  (VARIABLE_NAME(eCall), "Right (X1,[X1 < {a:int}])"),
+  (VARIABLE_NAME(eLetReturningCyclicNestedRecord), "Right (X3,[X1 < {a:X3}, X3 < {c:X1}])"),
+  (VARIABLE_NAME(eFuncReturningCyclicNestedRecord), ""),
+  (VARIABLE_NAME(eCallLet), "Right (X1,[X1 < {a:int}])")
   ]
 
 outputTypeTests :: [Test]
 outputTypeTests = map (uncurry mapToATest) outputTypeTestsData
  where 
-  mapToATest :: Exp -> String -> Test
-  mapToATest e expectedType = TestCase $ assertEqualShowingDiff
+  mapToATest :: (String, Exp) -> String -> Test
+  mapToATest (eName, e) expectedType = TestLabel eName $ TestCase $ assertEqualShowingDiff
     ("For program " ++ show e ++ ":")
     expectedType
     (show $ runCheck e)
@@ -45,13 +65,16 @@ eBoolTrue = EBoolTrue
 eBoolFalse :: Exp
 eBoolFalse = EBoolFalse
 
-oneFieldRecord :: Exp
-oneFieldRecord = 
+eLet :: Exp
+eLet = ELet "foo" ENew (EVar "foo")
+
+eRecordWithOneField :: Exp
+eRecordWithOneField = 
   ELet "foo" ENew $
   (ESet "foo" "a" $ EInt 42)
 
-recordWithManyFields :: Exp
-recordWithManyFields = 
+eRecordWithManyFields :: Exp
+eRecordWithManyFields = 
   ELet "foo" ENew $
   ELet "_" (ESet "foo" "a" $ EInt 42) $
   ELet "_" (ESet "foo" "b" $ EInt 42) $
@@ -86,10 +109,124 @@ eFunc =
     (EVar "x1")
   )
 
+eFuncWrongReturnType :: Exp
+eFuncWrongReturnType =
+  EFunc (Func 
+    ["x1", "x2"]
+    (TFunc (Map.fromList []) [TBool, TInt] TInt (Map.fromList []))
+    (EVar "x1")
+  )
+
 eFuncWithConstraints :: Exp
 eFuncWithConstraints =
   EFunc (Func 
     ["x1", "x2"]
-    (TFunc (Map.fromList []) [TBool, TInt] TBool (Map.fromList [("X1", oneFieldTRec "a" TInt)]))
-    oneFieldRecord
+    (TFunc (Map.fromList []) [TBool, TInt] (TVar "X1") (Map.fromList [("X1", oneFieldTRec "a" TInt)]))
+    eRecordWithOneField
   )
+
+eFuncReturningRecordWithMoreFieldsThanRequiredByConstraintsInFunctionSignature :: Exp
+eFuncReturningRecordWithMoreFieldsThanRequiredByConstraintsInFunctionSignature =
+  EFunc (Func 
+    ["x1", "x2"]
+    (TFunc (Map.fromList []) [TBool, TInt] (TVar "X1") (Map.fromList [("X1", oneFieldTRec "a" TInt)]))
+    eRecordWithManyFields
+  )
+
+eFuncWrongNumberOfArguments :: Exp
+eFuncWrongNumberOfArguments =
+  EFunc (Func 
+    ["x1", "x2"]
+    (TFunc (Map.fromList []) [TBool] TBool (Map.fromList [("X1", oneFieldTRec "a" TInt)]))
+    eRecordWithOneField
+  )
+
+eFuncDefiningNestedRecordInsideAndReturningIt :: Exp
+eFuncDefiningNestedRecordInsideAndReturningIt =
+  EFunc (Func 
+    ["x1", "x2"]
+    (TFunc (Map.empty) [TBool, TInt] (TVar "X3") (Map.fromList [("X1", oneFieldTRec "a" TInt), ("X3", oneFieldTRec "c" (TVar "X1"))])) $
+    eLetDefiningNestedRecordInsideAndReturningIt
+  )
+
+eLetReturningCyclicNestedRecord :: Exp
+eLetReturningCyclicNestedRecord =
+  ELet "x" ENew $
+  ELet "y" ENew $
+  ELet "z" ENew $
+  ELet "_" (ESet "x" "a" $ EVar "z") $
+  ELet "_" (ESet "y" "b" $ EInt 7) $
+  ELet "_" (ESet "z" "c" $ EVar "x") $
+    EVar "z"
+
+eFuncReturningCyclicNestedRecord :: Exp
+eFuncReturningCyclicNestedRecord =
+  EFunc (Func 
+    ["x1", "x2"]
+    (TFunc (Map.empty) [TBool, TInt] (TVar "X3") (Map.fromList [("X1", oneFieldTRec "a" (TVar "X3")), ("X3", oneFieldTRec "c" (TVar "X1"))])) $
+    eLetReturningCyclicNestedRecord
+  )
+
+
+eLetDefiningNestedRecordInsideAndReturningIt :: Exp
+eLetDefiningNestedRecordInsideAndReturningIt =
+  ELet "x" ENew $
+  ELet "_" (ESet "x" "a" $ EInt 42) $
+  ELet "y" ENew $
+  ELet "_" (ESet "y" "b" $ EInt 7) $
+  ELet "z" ENew $
+  ELet "_" (ESet "z" "c" $ EVar "x") $
+    EVar "z"
+
+eFuncDefiningNestedRecordInsideAndReturningItHavingDifferentlyNamedConstraintVariables :: Exp
+eFuncDefiningNestedRecordInsideAndReturningItHavingDifferentlyNamedConstraintVariables =
+  EFunc (Func 
+    ["x1", "x2"]
+    (TFunc (Map.empty) [TBool, TInt] (TVar "C") (Map.fromList [("A", oneFieldTRec "a" TInt), ("C", oneFieldTRec "c" (TVar "A"))])) $
+    eLetDefiningNestedRecordInsideAndReturningIt
+  )
+
+eFuncDefiningNestedRecordInsideAndHavingMismatchingConstraintSignature1 :: Exp
+eFuncDefiningNestedRecordInsideAndHavingMismatchingConstraintSignature1 =
+  EFunc (Func 
+    ["x1", "x2"]
+    (TFunc (Map.empty) [TBool, TInt] (TVar "C") (Map.fromList [("C", oneFieldTRec "c" TInt)])) $
+    eLetDefiningNestedRecordInsideAndReturningIt
+  )
+
+eFuncWithUnnecessaryConstraints :: Exp
+eFuncWithUnnecessaryConstraints =
+  EFunc (Func 
+    ["x1", "x2"]
+    (TFunc (Map.fromList []) [TBool, TInt] (TVar "X1") (Map.fromList [("X1", oneFieldTRec "a" TInt), ("X2", oneFieldTRec "b" TBool)]))
+    eRecordWithOneField
+  )
+
+eFuncDefiningNestedRecordInsideAndHavingWrongConstraintSignature :: Exp
+eFuncDefiningNestedRecordInsideAndHavingWrongConstraintSignature =
+  EFunc (Func 
+    ["x1", "x2"]
+    (TFunc (Map.empty) [TBool, TInt] (TVar "C") (Map.fromList [("A", oneFieldTRec "a" TInt)])) $
+    eLetDefiningNestedRecordInsideAndReturningIt
+  )
+
+eFuncDefiningRecordInsideButNotReturningIt :: Exp
+eFuncDefiningRecordInsideButNotReturningIt =
+  EFunc (Func 
+    ["x1", "x2"]
+    (TFunc (Map.empty) [TBool, TInt] TBool (Map.empty)) $
+    eLetDefiningRecordInsideButNotReturningIt
+  )
+
+eLetDefiningRecordInsideButNotReturningIt :: Exp
+eLetDefiningRecordInsideButNotReturningIt =
+  ELet "_" eRecordWithOneField (EBoolTrue)
+
+eCall :: Exp
+eCall =
+  ECall eFuncWithConstraints [EBoolTrue, (EInt 42)]
+
+eCallLet :: Exp
+eCallLet =
+  ELet "fun" eFuncWithConstraints $
+    ECall (EVar "fun") [EBoolTrue, (EInt 42)]
