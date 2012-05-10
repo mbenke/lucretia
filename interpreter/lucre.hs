@@ -19,3 +19,4 @@ runText name text = case Parser.runParser name text of
   Right p ->  do
     putStrLn $ "Parsed OK: " ++ show p
     runProg p
+    return ()
