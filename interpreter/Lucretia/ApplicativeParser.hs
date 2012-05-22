@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Lucretia.ApplicativeParser where
+import Lucretia.Definitions
 import Lucretia.Syntax
+import Lucretia.Types
 import Data.Functor
 import Control.Monad
 import Control.Monad.Error
@@ -47,7 +49,7 @@ pExp, pTerm, pF :: Parser Exp
 pExp = pFunc <|> pIf <|> pNew <|> pLet <|> pArith <|> pBreak
 
 mkFuncExp :: [Param] -> Exp -> Exp
-mkFuncExp as b = EFunc $ Func as b
+mkFuncExp as b = EFunc $ Func as TInt b --TODO
 -- mkFuncExp = ((.).(.)) EFunc Func
 -- or:         fmap fmap fmap EFunc Func
 
@@ -75,7 +77,7 @@ pIf = EIf <$> (kw "if" *> pExp)
 pLet :: Parser Exp
 pLet = ELets <$> (kw "let" *> pDefs) <*> (kw "in" *> pExp)
 
-pNew = ENew <$> (kw "new" *> pExp)
+pNew = kw "new" >> return ENew
 
 pArith :: Parser Exp
 pArith = pTerm `chainl1` pAdd
@@ -85,10 +87,9 @@ pAdd = symbol "+" >> return EAdd
 pTerm = pF
 pF = EInt <$> integer <|> pIdExp <|> (parens pExp >>= pMaybeCall) 
           <|> EDeref <$> (EVar <$> (symbol "*" >> identifier))
-          <|> pRec 
           <|> (kw "None" >> return ENone)
           
-pRec = symbol "{" >> symbol "}" >> return ERecEmpty
+--pRec = symbol "{" >> symbol "}" >> return ERecEmpty
 
 {- I = id I'
 I' = "." id I'' | eps

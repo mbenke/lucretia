@@ -1,13 +1,12 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances, FlexibleContexts #-}
 
 module Lucretia.TypeChecker.Types where
 
-import Data.List(intercalate)
-import Data.Map(Map)
+import Data.List (intercalate)
+import Data.Map (Map)
 import qualified Data.Map as Map
 
-import Lucretia.TypeChecker.Definitions(Name, Param)
+import Lucretia.TypeChecker.Definitions (Name, Param)
 
 data Type
   = TInt
@@ -56,38 +55,4 @@ instance Show Type where
 
 oneFieldTRec :: Name -> Type -> RecType
 oneFieldTRec a t = Map.fromList [(a,t)]
-
-
-data TypeIso = TypeIso Type Constraints
-data MapNameTypeIso = MapNameTypeIso Env Constraints
-data NameIso = NameIso Name Constraints
-data RecTypeIso = RecTypeIso RecType Constraints
-
-instance Eq MapNameTypeIso where
-  MapNameTypeIso e1 cs1 == MapNameTypeIso e2 cs2 = (toTypeIso e1 cs1) == (toTypeIso e2 cs2)
-    where
-    toTypeIso e cs = Map.map (\t -> TypeIso t cs) e
-
---Why *Iso types? To avoid rewriting the contents of "instance Eq (Map * *)".
-
---TODO introduce state: visited nodes, to avoid non-termination
---Problem with introducing state: how to have a state that is transferred between nodes compared in the code of "instance Eq (Map * *)" without rewriting this code.
-  -- 1. solution (unclean): use global state / global variables
-  -- 2. solution (not really answering above question): rewrite "instance Eq (Map * *)" using fold / State monad
-
-instance Eq TypeIso where
-  TypeIso (TVar n1) cs1 == TypeIso (TVar n2) cs2 = 
-    NameIso n1 cs1 == NameIso n2 cs2
-  TypeIso t1 _ == TypeIso t2 _ = 
-    t1 == t2
-
-instance Eq NameIso where
-  NameIso n1 cs1 == NameIso n2 cs2 = RecTypeIso (cs1 `findOrFail` n1) cs1 == RecTypeIso (cs2 `findOrFail` n2) cs2
-    where
-    cs `findOrFail` n = case Map.lookup n cs of
-			  Just result -> result
-			  Nothing     -> error $ "Cannot find type variable named: " ++ n1 ++ " in constraints: " ++ showConstraints cs ++ "."
-
-instance Eq RecTypeIso where
-  RecTypeIso r1 cs1 == RecTypeIso r2 cs2 = MapNameTypeIso r1 cs1 == MapNameTypeIso r2 cs2
 

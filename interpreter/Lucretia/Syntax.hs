@@ -1,10 +1,11 @@
 module Lucretia.Syntax where
 
-type Name = String
+import Lucretia.Types
+import Lucretia.Definitions (Name, Param)
+
 type Program = Defs
 type Defs = [Def]
-type Def = (Name,Exp)
-type Param = Name
+type Def = (Name, Exp)
 
 data Exp
     = EInt Integer
@@ -16,7 +17,7 @@ data Exp
     | ELet Name Exp Exp
     | ELets Defs Exp
     | EIf Exp Exp Exp
-    | ENew Exp
+    | ENew
 
     | EGet Name Name
     | ESet Name Name Exp
@@ -26,13 +27,13 @@ data Exp
     | ECall Exp [Exp]
 
     | EAdd Exp Exp
+    | EMul Exp Exp
 
     | EDeref Exp 
-    | ERecEmpty
 
       deriving (Eq,Show)
 
-data Func = Func [Param] Exp deriving (Eq,Show)
+data Func = Func [Param] Type Exp deriving (Eq,Show)
 
 instance Num Exp where
     fromInteger = EInt

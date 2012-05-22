@@ -1,6 +1,7 @@
-module Lucretia.TypeChecker.Main(runCheck, checkProg) where
+module Lucretia.TypeChecker.Main (runCheck, checkProg) where
 
-import Data.Map(Map)
+import Data.Monoid
+import Data.Map (Map)
 import qualified Data.Foldable as Foldable
 import qualified Data.Map as Map
 
@@ -8,11 +9,12 @@ import Control.Monad.Error
 import Control.Monad.State
 import Control.Monad.Identity
 
-import DebugUtils(traceShowId, traceShowIdHl)
+import DebugUtils (traceShowId, traceShowIdHl)
 
-import Lucretia.TypeChecker.Definitions(Name, Param)
+import Lucretia.TypeChecker.Definitions (Name, Param)
 import Lucretia.TypeChecker.Types
 import Lucretia.TypeChecker.Syntax
+import Lucretia.TypeChecker.IsomorphicModuloNames (iso)
 
 
 emptyEnv :: Env
@@ -192,7 +194,7 @@ findType env (EIf eIf eThen eElse) = do
 
 findType env (EFunc (Func xParams tFunc eBody)) = do
   let TFunc expectedConstraintsBefore tParams expectedU expectedConstraintsAfter = tFunc
-  (length xParams == length tParams) `orFail` "Number of arguments and number of their types doesn't match"
+  (length xParams == length tParams) `orFail` "Number of arguments and number of their types do not match"
   let params = zip xParams tParams
   let extendedEnv = foldl (\envAccumulator (eXi, tXi) -> Map.insert eXi tXi envAccumulator) env params
   constraintsBeforeBody <- getConstraints
@@ -200,8 +202,7 @@ findType env (EFunc (Func xParams tFunc eBody)) = do
   putConstraints expectedConstraintsBefore
   u <- findTypeCleanConstraints extendedEnv eBody
   actualConstraintsAfter <- getConstraints
-  --(expectedU, expectedConstraintsAfter) `areIsomorphic` (u, actualConstraintsAfter)
-  (TypeIso expectedU expectedConstraintsAfter == TypeIso u actualConstraintsAfter) `orFail` ("Type and associated constraints after type-checking method body: " ++ show u ++ ", " ++ showConstraints actualConstraintsAfter ++ " are not the same as declared in the signature: " ++ show expectedU ++ ", " ++ showConstraints expectedConstraintsAfter ++ ".")
+  iso (expectedU, expectedConstraintsAfter) (u, actualConstraintsAfter) `orFailE` ("Type and associated constraints after type-checking method body: " ++ show u ++ ", " ++ showConstraints actualConstraintsAfter ++ " are not the same as declared in the signature: " ++ show expectedU ++ ", " ++ showConstraints expectedConstraintsAfter ++ ".\n")
   --TODO maybe this:
   --(actualConstraintsAfter `areAtLeastThatStrongAs` expectedConstraintsAfter) `orFail` ("Returned value should match at least all the constraints that are declared in the signature of function " ++ funcName ++ ".")
 
@@ -214,13 +215,13 @@ findType env (ECall eFunc eParams) = do
 
   tFunc <- findTypeCleanConstraints env eFunc
   let TFunc expectedConstraintsBefore tParams tBody expectedConstraintsAfter = tFunc
-  (length eParams == length tParams) `orFail` ("Function " ++ funcName ++ " is applied to " ++ show (length eParams) ++ " parameters, but " ++ show (length tParams) ++ " parameters should be provided.")
+  (length eParams == length tParams) `orFail` ("Function " ++ funcName ++ " is applied to " ++ show (length eParams) ++ " parameters, but " ++ show (length tParams) ++ " parameters should be provided.\n")
   
   tParamsActual <- mapM (findTypeCleanConstraints env) eParams
-  (tParams == tParamsActual) `orFail` ("Types of parameters should be " ++ show tParams ++ " but are " ++ show tParamsActual ++ ".")
+  (tParams == tParamsActual) `orFail` ("Types of parameters should be " ++ show tParams ++ " but are " ++ show tParamsActual ++ ".\n")
 
   actualConstraintsBeforeBody <- getConstraints
-  (expectedConstraintsBefore `constraintsAreWeakerOrEqualTo` actualConstraintsBeforeBody) `orFail` ("Constraints before calling function " ++ funcName ++ ": " ++ showConstraints actualConstraintsBeforeBody ++ " are not that strong as pre-constraints in the function definition: " ++ showConstraints expectedConstraintsBefore ++ ".")
+  (expectedConstraintsBefore `constraintsAreWeakerOrEqualTo` actualConstraintsBeforeBody) `orFail` ("Constraints before calling function " ++ funcName ++ ": " ++ showConstraints actualConstraintsBeforeBody ++ " are not that strong as pre-constraints in the function definition: " ++ showConstraints expectedConstraintsBefore ++ ".\n")
 
   putConstraints $ actualConstraintsBeforeBody `merge` expectedConstraintsAfter
 
@@ -244,6 +245,10 @@ findName env _ = "(anonymous)"
 orFail :: MonadError e m => Bool -> e -> m ()
 orFail cond errorMsg =
   unless cond $ throwError errorMsg
+
+orFailE :: (Monoid e, MonadError e m) => Either e a -> e -> m ()
+orFailE (Left msg') msg = throwError $ mappend msg msg'
+orFailE (Right _)   _   = return ()
 
 getConstraints :: CM Constraints
 getConstraints = do

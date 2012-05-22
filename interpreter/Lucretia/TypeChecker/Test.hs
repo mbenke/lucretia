@@ -27,9 +27,9 @@ outputTypeTestsData = [
   (VARIABLE_NAME(eIfTOr), "Right (X1,[X1 < {a:int v bool}])"),
   (VARIABLE_NAME(eIfTFieldUndefined), "Right (X1,[X1 < {a:undefined v int, b:undefined v bool}])"),
   (VARIABLE_NAME(eFunc), "Right (([] bool int -> bool []),[])"),
-  (VARIABLE_NAME(eFuncWrongReturnType), "Left \"Type and associated constraints after type-checking method body: bool, [] are not the same as declared in the signature: int, [].\""),
+  (VARIABLE_NAME(eFuncWrongReturnType), "Left \"Type and associated constraints after type-checking method body: bool, [] are not the same as declared in the signature: int, [].\\nExpected type bool but got int.\\n\""),
   (VARIABLE_NAME(eFuncWithConstraints), "Right (([] bool int -> X1 [X1 < {a:int}]),[])"),
-  (VARIABLE_NAME(eFuncWrongNumberOfArguments), "Left \"Number of arguments and number of their types doesn't match\""),
+  (VARIABLE_NAME(eFuncWrongNumberOfArguments), "Left \"Number of arguments and number of their types do not match\""),
   --maybe this should be ok:
   --(eFuncReturningRecordWithMoreFieldsThanRequiredByConstraintsInFunctionSignature, "Right (([] bool int -> X1 [X1 < {a:int}]),[])"),
   (VARIABLE_NAME(eFuncDefiningRecordInsideButNotReturningIt), "Right (([] bool int -> bool []),[])"),
@@ -38,13 +38,13 @@ outputTypeTestsData = [
   (VARIABLE_NAME(eLetDefiningNestedRecordInsideAndReturningIt), "Right (X3,[X1 < {a:int}, X3 < {c:X1}])"),
   (VARIABLE_NAME(eFuncDefiningNestedRecordInsideAndReturningItHavingDifferentlyNamedConstraintVariables), "Right (([] bool int -> C [A < {a:int}, C < {c:A}]),[])"),
   (VARIABLE_NAME(eFuncWithUnnecessaryConstraints), "Right (([] bool int -> X1 [X1 < {a:int}]),[])"),
-  (VARIABLE_NAME(eFuncDefiningNestedRecordInsideAndHavingMismatchingConstraintSignature1), "Left \"Type and associated constraints after type-checking method body: X3, [X1 < {a:int}, X3 < {c:X1}] are not the same as declared in the signature: C, [C < {c:int}].\""),
+  (VARIABLE_NAME(eFuncDefiningNestedRecordInsideAndHavingMismatchingConstraintSignature1), "Left \"Type and associated constraints after type-checking method body: X3, [X1 < {a:int}, X3 < {c:X1}] are not the same as declared in the signature: C, [C < {c:int}].\\nExpected type X1 but got int.\\n\""),
 
   --TODO test catching error
-  (VARIABLE_NAME(eFuncDefiningNestedRecordInsideAndHavingWrongConstraintSignature), ""),
+  (VARIABLE_NAME(eFuncWithDanglingTypeVariableInSignature), "Left \"Type and associated constraints after type-checking method body: X3, [X1 < {a:int}, X3 < {c:X1}] are not the same as declared in the signature: C, [A < {a:int}].\\nCannot find type variable named: C in constraints: [A < {a:int}].\\n\""),
   (VARIABLE_NAME(eCall), "Right (X1,[X1 < {a:int}])"),
   (VARIABLE_NAME(eLetReturningCyclicNestedRecord), "Right (X3,[X1 < {a:X3}, X3 < {c:X1}])"),
-  (VARIABLE_NAME(eFuncReturningCyclicNestedRecord), ""),
+  (VARIABLE_NAME(eFuncReturningCyclicNestedRecord), "Right (([] bool int -> X3 [X1 < {a:X3}, X3 < {c:X1}]),[])"),
   (VARIABLE_NAME(eCallLet), "Right (X1,[X1 < {a:int}])")
   ]
 
@@ -202,8 +202,8 @@ eFuncWithUnnecessaryConstraints =
     eRecordWithOneField
   )
 
-eFuncDefiningNestedRecordInsideAndHavingWrongConstraintSignature :: Exp
-eFuncDefiningNestedRecordInsideAndHavingWrongConstraintSignature =
+eFuncWithDanglingTypeVariableInSignature :: Exp
+eFuncWithDanglingTypeVariableInSignature =
   EFunc (Func 
     ["x1", "x2"]
     (TFunc (Map.empty) [TBool, TInt] (TVar "C") (Map.fromList [("A", oneFieldTRec "a" TInt)])) $
