@@ -14,16 +14,19 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 
 import Data.Foldable
+import Data.Function (on)
 
 import Lucretia.TypeChecker.Definitions (Name, Param)
 import Lucretia.TypeChecker.Types
 
 class IsomorphicModuloNames a where
-  isoM :: (a, Constraints) -> (a, Constraints) -> M ()
+  isoM :: a -> a -> M ()
   iso  :: (a, Constraints) -> (a, Constraints) -> Either String ()
-  iso a1 a2 = evalStateT (isoM a1 a2) Set.empty
+  iso (a, cs) (a', cs') = evalStateT (isoM a a') (S Set.empty cs cs')
 
-type M = StateT Isomorphism (Either String)
+type M = StateT S (Either String)
+-- TODO extract Constraints as part of the state
+data S = S { visited :: Isomorphism, cs :: Constraints, cs' :: Constraints }
 type Isomorphism = Set (Name, Name) -- visited node pairs
 
 isomorphic :: M ()
@@ -32,57 +35,42 @@ notIsomorphic :: String -> M ()
 notIsomorphic why = throwError why
 
 instance IsomorphicModuloNames Type where
-  isoM (TVar n, cs) (TVar n', cs') =
-    isoM (n, cs) (n', cs')
-  isoM (a, _) (a', _) =
-    unless (a == a') $ notIsomorphic $ "Expected type " ++ show a' ++ " but got " ++ show a ++ ".\n"
+  isoM (TVar n) (TVar n') = isoM n n'
+  isoM a a' = unless (a == a') $ notIsomorphic $ "Expected type " ++ show a' ++ " but got " ++ show a ++ ".\n"
 
 instance IsomorphicModuloNames Name where
-  isoM (n, cs) (n', cs') = do
-    {- if we would like to throw the error the other way
-    -}
-    -- TODO byc moze tu da sie sprawdzac czy (n, n') bylo odwiedzone
-    --
-    -- TODO:
-    -- if (S.contains (n, n') < get) then ok
-				     -- else guard not contains (n, _) or (_, n')
-    --guard $ 
-    --TODO (||)
-    --  <$> (withState $ S.member (n, n'))
-    --  <*> ((&&) <$> (not $ memberFst n) <*> (not $ memberSnd n') <*> isoM (lookupOrFail n cs, cs)
-    v <- get
+  isoM n n' = do
+    v <- gets visited
     if Set.member (n, n') v
       then isomorphic
-      else a
+      else cont
     where
-    a = do
-      v <- get
+    cont = do
+      v <- gets visited
       guard $ not (memberFst n v) && not (memberSnd n' v)
-      modify $ Set.insert (n, n')
-      t  <- lookupOrFail n  cs
-      t' <- lookupOrFail n' cs'
-      isoM (t, cs) (t', cs')
+      modify $ \s -> s { visited = Set.insert (n, n') (visited s) }
+      -- TODO OPT RTR using lenses
+      -- http://stackoverflow.com/questions/8469044/template-haskell-with-record-field-name-as-variable
+      t  <- lookupM n  =<< gets cs
+      t' <- lookupM n' =<< gets cs'
+      isoM t t'
 
     memberFst :: (Eq a, Foldable f) => a -> f (a, b) -> Bool
     memberFst x = any $ \(y, _) -> x == y
     memberSnd :: (Eq b, Foldable f) => b -> f (a, b) -> Bool
     memberSnd x = any $ \(_, y) -> x == y
 
-    lookupOrFail :: Name -> Constraints -> M RecType
-    lookupOrFail n cs =
+    lookupM :: Name -> Constraints -> M RecType
+    lookupM n cs =
       case Map.lookup n cs of
 	Just result -> return result
 	Nothing     -> throwError $ "Cannot find type variable named: " ++ n ++ " in constraints: " ++ showConstraints cs ++ ".\n"
 
 instance IsomorphicModuloNames (Map Name Type) where
-  (m, cs) `isoM` (m', cs') = do
-    guard $ Map.size m == Map.size m'
-    (Map.toAscList m, cs) `isoM` (Map.toAscList m', cs')
+  isoM = isoM `on` Map.toAscList
+  --isoM m m' = Map.toAscList m `isoM` Map.toAscList m'
 
---TODO extract Constraints to monad state
 instance IsomorphicModuloNames [(Name, Type)] where
-  ((_, t):xs, cs) `isoM` ((_, t'):xs', cs') = do
-    (t,  cs) `isoM` (t',  cs')
-    (xs, cs) `isoM` (xs', cs')
-  ([], _)         `isoM` ([], _)            = isomorphic
+  isoM ((_, t):xs) ((_, t'):xs') = isoM t t' >> isoM xs xs'
+  isoM [] [] = isomorphic
 
