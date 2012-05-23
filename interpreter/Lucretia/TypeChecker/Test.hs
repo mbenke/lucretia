@@ -3,8 +3,9 @@
 module Lucretia.TypeChecker.Test where
 
 import Test.HUnit
-import Data.Map(Map)
+
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import HUnitUtils(assertEqualShowingDiff)
 
@@ -45,7 +46,9 @@ outputTypeTestsData = [
   (VARIABLE_NAME(eCall), "Right (X1,[X1 < {a:int}])"),
   (VARIABLE_NAME(eLetReturningCyclicNestedRecord), "Right (X3,[X1 < {a:X3}, X3 < {c:X1}])"),
   (VARIABLE_NAME(eFuncReturningCyclicNestedRecord), "Right (([] bool int -> X3 [X1 < {a:X3}, X3 < {c:X1}]),[])"),
-  (VARIABLE_NAME(eCallLet), "Right (X1,[X1 < {a:int}])")
+  (VARIABLE_NAME(eCallLet), "Right (X1,[X1 < {a:int}])"),
+  (VARIABLE_NAME(eFuncTOr), "Right (([]  -> X [X < {a:int v bool}]),[])"),
+  (VARIABLE_NAME(eFuncTOrWrongConstraints), "Left \"Type and associated constraints after type-checking method body: X1, [X1 < {a:int v bool}] are not the same as declared in the signature: X, [X < {a:int}].\\nType mismatch:\\n  [int]\\n  [int,bool]\"")
   ]
 
 outputTypeTests :: [Test]
@@ -230,3 +233,23 @@ eCallLet :: Exp
 eCallLet =
   ELet "fun" eFuncWithConstraints $
     ECall (EVar "fun") [EBoolTrue, (EInt 42)]
+
+emptyConstraints = Map.fromList []
+
+eFuncTOr :: Exp
+eFuncTOr =
+  EFunc $ Func
+    []
+    (TFunc emptyConstraints [] (TVar "X")
+      (Map.fromList [("X", oneFieldTRec "a" (TOr $ Set.fromList [TBool, TInt]))])
+    ) $
+    eIfTOr
+
+eFuncTOrWrongConstraints :: Exp
+eFuncTOrWrongConstraints =
+  EFunc $ Func
+    []
+    (TFunc emptyConstraints [] (TVar "X")
+      (Map.fromList [("X", oneFieldTRec "a" (TOr $ Set.fromList [TInt]))])
+    ) $
+    eIfTOr

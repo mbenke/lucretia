@@ -17,8 +17,12 @@ import qualified Data.Set as Set
 import Data.Foldable
 import Data.Function (on)
 
+import Data.List (permutations)
+
 import Lucretia.TypeChecker.Definitions (Name, Param)
 import Lucretia.TypeChecker.Types
+
+import LocalState (localState_)
 
 class IsomorphicModuloNames a where
   iso  :: (a, Constraints) -> (a, Constraints) -> Either String ()
@@ -35,6 +39,16 @@ notIsomorphic = throwError
 
 instance IsomorphicModuloNames Type where
   isoM (TVar n) (TVar n') = isoM n n'
+  isoM (TOr s) (TOr s') = isoM' (Set.toList s) (Set.toList s')
+    where
+    isoM' :: [Type] -> [Type] -> M ()
+    isoM' ts = isoM'' ts (permutations ts)
+    isoM'' :: [Type] -> [[Type]] -> [Type] -> M ()
+    isoM'' ts (ps:pss) ts' =
+      (localState_ $ isoM ps ts') `catchError` \_ -> isoM'' ts pss ts'
+    isoM'' ts [] ts' = throwError $ "Type mismatch:\n  " ++ show ts ++ "\n  " ++ show ts'
+  isoM (TOr s) t = isoM (TOr s) (TOr $ Set.singleton t)
+  isoM t (TOr s) = isoM (TOr $ Set.singleton t) (TOr s)
   isoM a a' = unless (a == a') $ notIsomorphic $ "Expected type " ++ show a' ++ " but got " ++ show a ++ ".\n"
 
 instance IsomorphicModuloNames Name where
@@ -68,6 +82,13 @@ instance IsomorphicModuloNames (Map Name Type) where
   --isoM m m' = Map.toAscList m `isoM` Map.toAscList m'
 
 instance IsomorphicModuloNames [(Name, Type)] where
-  isoM ((_, t):xs) ((_, t'):xs') = isoM t t' >> isoM xs xs'
-  isoM [] [] = isomorphic
+  isoM = isoM `on` map snd
+
+instance IsomorphicModuloNames [Type] where
+  isoM ts ts' =
+    if length ts == length ts'
+      then isoM' ts ts'
+      else throwError $ "Length of " ++ show ts ++ " and " ++ show ts' ++ " is different."
+    where isoM' (t:ts) (t':ts') = isoM t t' >> isoM' ts ts'
+	  isoM' [] [] = isomorphic
 
