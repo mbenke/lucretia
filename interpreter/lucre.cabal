@@ -12,3 +12,8 @@ executable lucre
     parsec >=3
   main-is: lucre.hs
 
+executable Test
+  build-depends: 
+    HUnit,
+    process
+  main-is: Test.hs

@@ -1,5 +1,16 @@
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Lucretia.TypeChecker.IsomorphicModuloNames
+-- Copyright   :  (c) Michał Oniszczuk 2012
+--
+-- Maintainer  :  mo262537@students.mimuw.edu.pl
+--
+-- Isomorphism between 'Type' in context of 'Constraints' which
+-- diregards differences in names of variables.
+-----------------------------------------------------------------------------
 {-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
 
+--module Lucretia.TypeChecker.IsomorphicModuloNames (iso) where
 module Lucretia.TypeChecker.IsomorphicModuloNames (iso) where
 
 import Prelude hiding (any)
@@ -24,6 +35,8 @@ import Lucretia.TypeChecker.Types
 
 import LocalState (localState_)
 
+-- | Isomorphism between 'Type' in context of 'Constraints' which
+-- diregards differences in names of variables.
 class IsomorphicModuloNames a where
   iso  :: (a, Constraints) -> (a, Constraints) -> Either String ()
   iso (a, cs) (a', cs') = evalStateT (runReaderT (isoM a a') (cs, cs')) Set.empty
