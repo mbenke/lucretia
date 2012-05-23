@@ -1,9 +1,11 @@
 module Lucretia.TypeChecker.Main (runCheck, checkProg) where
 
 import Data.Monoid
-import Data.Map (Map)
 import qualified Data.Foldable as Foldable
+import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 
 import Control.Monad.Error
 import Control.Monad.State
@@ -273,8 +275,8 @@ mergeRecTypes r1 r2 =
     where
     intersection = Map.intersectionWith mergeTypes r1 r2
     rest = Map.map canBeUndefined r1_xor_r2
-      where canBeUndefined (TOr ts) = TOr (TFieldUndefined:ts)
-            canBeUndefined t = TOr [TFieldUndefined, t] 
+      where canBeUndefined (TOr ts) = TOr $ Set.insert TFieldUndefined ts
+            canBeUndefined t = TOr $ Set.fromList [TFieldUndefined, t] 
     r1_xor_r2 = Map.union (Map.difference r1 r2) (Map.difference r2 r1)
 
 mergeTypes :: Type -> Type -> Type
@@ -283,16 +285,10 @@ mergeTypes t1 t2
   | otherwise = mergeInequalTypes t1 t2
   where
   mergeInequalTypes :: Type -> Type -> Type
-  mergeInequalTypes (TOr t1) (TOr t2) = TOr $ t1 ++ t2
-  mergeInequalTypes t1 (TOr t2) = 
-    if t1 `elem` t2
-      then TOr t2
-      else TOr $ t1:t2
-  mergeInequalTypes (TOr t1) t2 =
-    if t2 `elem` t1
-      then TOr t1
-      else TOr $ t2:t1
-  mergeInequalTypes t1 t2 = TOr [t1, t2]
+  mergeInequalTypes (TOr t1) (TOr t2) = TOr $ Set.union t1 t2
+  mergeInequalTypes t1 (TOr t2) = TOr $ Set.insert t1 t2
+  mergeInequalTypes (TOr t1) t2 = TOr $ Set.insert t2 t1
+  mergeInequalTypes t1 t2 = TOr $ Set.fromList [t1, t2]
 
 mergeFresh :: [Int] -> [Int] -> [Int]
 mergeFresh (fresh1:_) (fresh2:_) = [(max fresh1 fresh2)..]

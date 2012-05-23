@@ -5,6 +5,8 @@ module Lucretia.TypeChecker.Types where
 import Data.List (intercalate)
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 
 import Lucretia.TypeChecker.Definitions (Name, Param)
 
@@ -13,10 +15,10 @@ data Type
   | TBool
   | TVar Name
   | TRec RecType --TODO remove
-  | TOr [Type] --TODO [Type] ~> Set Type
+  | TOr (Set Type)
   | TFieldUndefined
   | TFunc Constraints [Type] Type Constraints
-  deriving Eq
+  deriving (Eq, Ord)
 type RecType = Map Name Type
 type Constraints = Map Name RecType
 
@@ -47,7 +49,7 @@ instance Show Type where
   show TBool = "bool"
   show (TVar v) = v
   show (TRec r) = showRec r
-  show (TOr ts) = intercalate " v " (map show ts)
+  show (TOr ts) = intercalate " v " $ map show $ Set.toList ts
   show (TFieldUndefined) = "undefined"
   show (TFunc constraintsBefore paramTypes bodyType constraintsAfter) = "(" ++ showConstraints constraintsBefore ++ " " ++ intercalate " " (map show paramTypes) ++ " -> " ++ show bodyType ++ " " ++ showConstraints constraintsAfter ++ ")"
 
