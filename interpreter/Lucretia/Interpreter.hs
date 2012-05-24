@@ -2,6 +2,7 @@
 -- Tiny4.Interpreter with break handling
 
 module Lucretia.Interpreter where
+import Lucretia.Definitions
 import Lucretia.Syntax
 import Lucretia.Exception
 
@@ -38,6 +39,9 @@ runProgGetOutput p =
       case a of
         Left exc -> "Exception: "++show exc++"\n"
         Right _ -> ""
+
+runExp :: Exp -> IO (Val, String)
+runExp e = runProg [("_", e)]
 
 --TODO refactor: rename to: runLuProgramPrintingDebugInfo
 runProg :: Defs -> IO (Val, String)
@@ -229,14 +233,18 @@ appendToOutput :: String -> IM ()
 appendToOutput s = modify $ \state -> state { 
   output = output state ++ s}
 
+op f e1 e2 = do
+  i1 <- getVInt =<< eval e1
+  i2 <- getVInt =<< eval e2
+  return $ VInt $ f i1 i2
+
 -- | Evaluate expressions
 eval :: Exp -> IM Val
 eval (EInt i) = return (VInt i)
 eval (EVar s) = getVar s
-eval (EAdd e1 e2) = do -- liftM2 (+) (eval e1) (eval e2)
-  i1 <- getVInt =<< eval e1 
-  i2 <- getVInt =<< eval e2
-  return $ VInt (i1+i2)                  
+-- liftM2 (+) (eval e1) (eval e2)
+eval (EAdd e1 e2) = op (+) e1 e2
+eval (EMul e1 e2) = op (*) e1 e2
 eval (EIf e1 e2 e3) = do
      v1 <- eval e1
      if isTrueVal v1 then eval e2 else eval e3
@@ -253,16 +261,16 @@ eval (ELets ds e0) = do
      v0 <- eval e0
      leaveScope
      return v0
-eval (ENew e) = do     
-     v <- eval e
+eval ENew = do     
      l <- alloc
-     updateStore l v
+     updateStore l (VRec Map.empty)
      return $ VLoc l
+{-
 eval (EDeref e) = do
   v <- eval e
   l <- getVLoc v
   getLocContents l
-eval ERecEmpty = return $ VRec Map.empty
+ -}
 eval (EGet n1 n2) = do
    vl <- getVar n1
    l  <- getVLoc vl
@@ -295,7 +303,7 @@ eval call@(ECall (EVar "print") es) = do
   return VNone
 eval call@(ECall e es) = do
   v <- eval e
-  f@(Func as body) <- getVFun v
+  f@(Func as _ body) <- getVFun v
   vs <- mapM eval es
   enterScope
   passParams as vs
