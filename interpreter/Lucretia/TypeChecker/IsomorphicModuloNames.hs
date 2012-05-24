@@ -8,10 +8,11 @@
 -- Isomorphism between 'Type' in context of 'Constraints' which
 -- diregards differences in names of variables.
 -----------------------------------------------------------------------------
+{-# OPTIONS_HADDOCK ignore-exports #-}
 {-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
 
+module Lucretia.TypeChecker.IsomorphicModuloNames where
 --module Lucretia.TypeChecker.IsomorphicModuloNames (iso) where
-module Lucretia.TypeChecker.IsomorphicModuloNames (iso) where
 
 import Prelude hiding (any)
 
@@ -35,14 +36,19 @@ import Lucretia.TypeChecker.Types
 
 import LocalState (localState_)
 
--- | Isomorphism between 'Type' in context of 'Constraints' which
--- diregards differences in names of variables.
+-- | Minimal definition is just isoM.
 class IsomorphicModuloNames a where
-  iso  :: (a, Constraints) -> (a, Constraints) -> Either String ()
+  -- Unwraps the result of running isoM.
+  iso  :: (a, Constraints) -- ^ Is this isomorphic with…
+       -> (a, Constraints) -- ^ … that.
+       -> Either String () -- ^ Either: error message indicating failure or
+                           -- @()@ indicating success
   iso (a, cs) (a', cs') = evalStateT (runReaderT (isoM a a') (cs, cs')) Set.empty
-  isoM :: a -> a -> M ()
-
-type M = ReaderT (Constraints, Constraints) (StateT Isomorphism (Either String))
+  isoM :: a -- ^ Is this isomorphic with…
+       -> a -- ^ … that.
+       -> M ()
+type M = ReaderT Environment (StateT Isomorphism (Either String))
+type Environment = (Constraints, Constraints)
 type Isomorphism = Set (Name, Name) -- visited node pairs
 
 isomorphic :: M ()
