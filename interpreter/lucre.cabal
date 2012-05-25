@@ -11,9 +11,22 @@ executable lucre
     mtl >= 1.1,
     parsec >=3
   main-is: lucre.hs
+  other-modules: Lucretia.ApplicativeParser, Lucretia.Definitions, 
+    Lucretia.Syntax, Lucretia.Exception, Lucretia.Interpreter,
+    Lucretia.Types, Lucretia.TypeChecker.Definitions
 
 executable Test
   build-depends: 
     HUnit,
     process
   main-is: Test.hs
+  other-modules: Lucretia.ApplicativeParser, Lucretia.Definitions, 
+    Lucretia.Syntax, Lucretia.Exception, Lucretia.Interpreter,
+    Lucretia.Types, 
+    Lucretia.TypeChecker.Definitions,
+    Lucretia.TypeChecker.IsomorphicModuloNames,
+    Lucretia.TypeChecker.Main,
+    Lucretia.TypeChecker.Syntax,
+    Lucretia.TypeChecker.Test,
+    Lucretia.TypeChecker.Types,
+    DebugUtils, Diff, HUnitUtils, LocalState, OrFail
