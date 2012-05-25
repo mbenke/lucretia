@@ -5,11 +5,8 @@ import Lucretia.TypeChecker.Definitions(Name, Param)
 
 type Program = Defs
 type Defs = [Def]
-type Def = (Name,Exp)
+type Def = (Name, Exp)
 
--- now this file is almost the same as Lucretia.Syntax
--- TODO eliminate differences
---
 data Exp 
     = EInt Integer
     | EBoolTrue
@@ -20,7 +17,6 @@ data Exp
     | ELet Name Exp Exp
     | ELets Defs Exp
     | EIf Exp Exp Exp
---    | ENew Exp
     | ENew
 
     | EGet Name Name
@@ -31,13 +27,10 @@ data Exp
     | ECall Exp [Exp]
 
     | EAdd Exp Exp
-
---    | EDeref Exp 
---    | ERecEmpty
+    | EMul Exp Exp
 
       deriving (Eq,Show)
 
---data Func = Func [Param] Exp deriving (Eq,Show)
 data Func = Func [Param] Type Exp deriving (Eq,Show)
 
 instance Num Exp where

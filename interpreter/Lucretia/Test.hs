@@ -1,5 +1,7 @@
 module Lucretia.Test(main, tests) where
+import Lucretia.Definitions
 import Lucretia.Syntax
+import Lucretia.Types
 import Lucretia.Interpreter
 -- import qualified Lucretia.ParsecParser as Parser
 import qualified Lucretia.ApplicativeParser as Parser
@@ -74,7 +76,7 @@ byValueTestsData = [
   (text2, VInt 1),
   (text4, VNone),
   (text7, VInt 1),
-  (text8, VFun $ Func ["x"] $ EVar "x"),
+  (text8, VFun $ Func ["x"] TInt $ EVar "x"),
   (text9, VInt 42),
   (text12, VNone)
   ]
@@ -159,8 +161,7 @@ testException = do
 
 prog2 :: Defs
 prog2 = [
-  ("l", ENew 1),
-  ("x", EDeref (EVar "l")),
+  ("x", (EInt 1)),
   ("_", (ELets [("x", 2)] ( 
     EIf (EVar "x") (EVar "x") 42))),
   ("y" , 2),
@@ -168,7 +169,7 @@ prog2 = [
   ]
 prog3 = [ 
   ("y", 
-   (ELet "x" (ENew 42) (EVar "x"))),
+   (ELet "x" (EInt 42) (EVar "x"))),
   ("_",derefVar "y") ]
 -- undefined var
 bad1 = [("_", EVar "x")]
@@ -199,7 +200,7 @@ prog6 = expr $ ELabel "return" (ELet "x" (EBreak"foo" 1) 2)
 prog7 = expr $ ELabel "return" (ELet "x" (EBreak"return" 1) 2)
 text7 = "return: let x=break return 1 in 2"
 
-func1 = EFunc (Func ["x"] (EVar "x"))
+func1 = EFunc (Func ["x"] TInt (EVar "x"))
 -- expect id
 prog8 = expr func1
 text8 = "func(x) x"
