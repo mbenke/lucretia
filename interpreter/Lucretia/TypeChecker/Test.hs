@@ -23,6 +23,13 @@ outputTypeTestsData = [
   (VARIABLE_NAME(eInt), "Right (int,[])"),
   (VARIABLE_NAME(ENew), "Right (X1,[X1 < {}])"),
   (VARIABLE_NAME(eLet), "Right (X1,[X1 < {}])"),
+  -- Record update (update-old)
+  (VARIABLE_NAME(eSetGet), "Right (int,[])"),
+  -- Record access (access)
+  (VARIABLE_NAME(eGet_noVar), "Left \"Unknown variable foo\""),
+  (VARIABLE_NAME(eGet_varNotRec), "Left \"Variable foo: type mismatch: expected record type, but got bool.\""),
+  (VARIABLE_NAME(eGet_wrongField), "Left \"Unknown field foo.a\""),
+
   (VARIABLE_NAME(eRecordWithOneField), "Right (X1,[X1 < {a:int}])"),
   (VARIABLE_NAME(eRecordWithManyFields), "Right (X1,[X1 < {a:int, b:int, c:int}])"),
   (VARIABLE_NAME(eIfTOr), "Right (X1,[X1 < {a:int v bool}])"),
@@ -63,10 +70,32 @@ outputTypeTests = map (uncurry mapToATest) outputTypeTestsData
 
 eInt :: Exp
 eInt = EInt 42
+
 eBoolTrue :: Exp
 eBoolTrue = EBoolTrue
+
 eBoolFalse :: Exp
 eBoolFalse = EBoolFalse
+
+eGet_noVar :: Exp
+eGet_noVar =
+  EGet "foo" "a"
+
+eGet_varNotRec :: Exp
+eGet_varNotRec =
+  ELet "foo" EBoolTrue $
+  EGet "foo" "a"
+
+eGet_wrongField :: Exp
+eGet_wrongField =
+  ELet "foo" ENew $
+  EGet "foo" "a"
+
+eSetGet :: Exp
+eSetGet =
+  ELet "foo" ENew $
+  ELet "_" (ESet "foo" "a" $ EInt 42) $
+  EGet "foo" "a"
 
 eLet :: Exp
 eLet = ELet "foo" ENew (EVar "foo")

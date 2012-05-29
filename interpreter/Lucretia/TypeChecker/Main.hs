@@ -30,11 +30,13 @@
 --module Lucretia.TypeChecker.Main (runCheck, checkProg) where
 module Lucretia.TypeChecker.Main where
 
-import qualified Data.Foldable as Foldable
+import Prelude hiding (all)
+
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Foldable (all)
 
 import Control.Monad.Error
 import Control.Monad.State
@@ -44,7 +46,7 @@ import DebugUtils (traceShowId, traceShowIdHl)
 
 import OrFail (orFail, orFailE)
 
-import Lucretia.TypeChecker.Definitions (Name, Param)
+import Lucretia.TypeChecker.Definitions (Name, Param, Var, TVar)
 import Lucretia.TypeChecker.Types
 import Lucretia.TypeChecker.Syntax
 import Lucretia.TypeChecker.IsomorphicModuloNames (iso)
@@ -56,46 +58,36 @@ findType :: Env -> Exp -> CM Type
 
 -- | Record update (update-old)
 findType env (ESet x a e) = do
-  TVar tX <- envType env x
+  tX <- getTVar env x
   t2 <- findTypeCleanConstraints env e
   extendRecordConstraint tX a t2
   return (TVar tX)
 
--- | Record access
-{-
--- TODO uncomment, make run
+-- | Record access (access)
 findType env (EGet x a) = do
-  tX <- envType env x
-  case tX of
-    TRec t     -> do
-      guard $ doesNotHaveBottom u
+  let err_a = x ++ "." ++ a
 
-doesNotHaveBottom :: Type -> Bool
-doesNotHaveBottom TInt = True
-doesNotHaveBottom TBool = True
-doesNotHaveBottom TVar _ = True
-doesNotHaveBottom TRec _ = True
-doesNotHaveBottom TOr t1 t2 = doesNotHaveBottom t1 && doesNotHaveBottom t2
-doesNotHaveBottom TFieldUndefined = False
-    --TOr ts -> TOr mapMonad ts
-      
-
--- TODO uncomment, make run
-    otherwise -> throwError $ x ++ " should be of an object type, but is " ++ show tX ++ "\n" ++ "  In the expression " ++ show (EGet x a) --showPretty
-
-
-  u <- getConstraintFor x
-  --zamiana na mapę
-  --TODO map constraints
-
-
-
-envType :: Env -> Name -> CM Type
-envType env x = case Map.lookup x env of
-  Nothing -> throwError $ "Unknown var "++x
-  Just t -> return t
-  
--}
+  u <- findFieldType err_a a =<< getRecord =<< getTVar env x
+  {-
+  t_X <- getTVar env x
+  rec <- getRecord t_X
+  t_u <- findFieldType err_a a rec
+  -}
+  doesNotHaveBottom u `orFail` (err_a ++ " may be undefined.")
+  return u
+    where
+    findFieldType :: Name -- ^ in case of error: pretty name of the field
+                  -> Name -- ^ field
+                  -> RecType -- ^ type of record
+    	      -> CM Type -- ^ type of field
+    findFieldType err_a a rec = case Map.lookup a rec of
+      Nothing -> throwError $ "Unknown field " ++ err_a
+      Just t -> return t
+    
+    doesNotHaveBottom :: Type -> Bool
+    doesNotHaveBottom TFieldUndefined = False
+    doesNotHaveBottom (TOr t) = all doesNotHaveBottom t
+    doesNotHaveBottom _ = True
 
 -- | Conditional instruction (if)
 findType env (EIf eIf eThen eElse) = do
@@ -181,15 +173,21 @@ findType env ENew = do
   return $ TVar t
 
 -- | Other rules, not mentioned in the white paper
-findType env (EVar x) = envType env x 
+findType env (EVar x) = getType env x 
 findType env (EInt _) = return TInt
 findType env EBoolTrue = return TBool
 findType env EBoolFalse = return TBool
 
-envType :: Env -> Name -> CM Type
-envType env x = case Map.lookup x env of
-  Nothing -> throwError $ "Unknown var "++x
+getTVar :: Env -> Name -> CM TVar
+getTVar env x = unpack =<< getType env x
+  where unpack (TVar tVar) = return tVar
+	unpack t = throwError $ "Variable " ++ x ++ ": type mismatch: expected record type, but got " ++ show t ++ "."
+
+getType :: Env -> Name -> CM Type
+getType env x = case Map.lookup x env of
+  Nothing -> throwError $ "Unknown variable " ++ x
   Just t -> return t
+
 
 -- ** Helper functions
 
@@ -218,13 +216,13 @@ mergeCons = Map.unionWith mergeRecTypes
 -- | Merge RecTypes, @Bishop@ relation in wp.
 mergeRecTypes :: RecType -> RecType -> RecType
 mergeRecTypes r1 r2 = 
-  Map.union intersection rest
+  intersection `Map.union` rest
     where
     intersection = Map.intersectionWith mergeTypes r1 r2
     rest = Map.map canBeUndefined r1_xor_r2
       where canBeUndefined (TOr ts) = TOr $ Set.insert TFieldUndefined ts
             canBeUndefined t = TOr $ Set.fromList [TFieldUndefined, t] 
-    r1_xor_r2 = Map.union (Map.difference r1 r2) (Map.difference r2 r1)
+    r1_xor_r2 = Map.difference r1 r2 `Map.union` Map.difference r2 r1
 
 -- | Merge Types, @Bishop@ relation in wp.
 mergeTypes :: Type -> Type -> Type
@@ -250,7 +248,7 @@ cleanConstraints :: Env -> Type -> Constraints -> Constraints
 cleanConstraints env returnType inputCs = foldl addConstraintsForName Map.empty tVarsNeededInEnv
   where
   tVarsNeededInEnv :: [Name]
-  tVarsNeededInEnv = filterTVars $ returnType:(Map.elems env)
+  tVarsNeededInEnv = filterTVars $ returnType : Map.elems env
 
   addConstraintsForName :: Constraints -> Name -> Constraints
   addConstraintsForName neededCsAcc neededTVarName
@@ -262,7 +260,7 @@ cleanConstraints env returnType inputCs = foldl addConstraintsForName Map.empty 
     neededCsAccIncreased = Map.insert neededTVarName neededTVarType neededCsAcc
 
   filterTVars :: [Type] -> [Name]
-  filterTVars ts = map (\(TVar n) -> n) $ filter isTVar $ ts
+  filterTVars = map (\(TVar n) -> n) . filter isTVar
     where
       isTVar (TVar _) = True
       isTVar _ = False
@@ -308,19 +306,19 @@ freshInt = do
 -- ** Constraints
 
 getConstraints :: CM Constraints
-getConstraints = do
-  state <- get
-  return $ cstCons state
+getConstraints = gets cstCons
 
 putConstraints :: Constraints -> CM ()
-putConstraints constraints = do
-  state <- get
-  put $ state { cstCons = constraints }
+putConstraints constraints =
+  modify $ \state -> state { cstCons = constraints } 
+
+getsConstraints :: (Constraints -> a) -> CM a
+getsConstraints f = fmap f getConstraints
 
 type ModifyConstraints = Constraints -> Constraints
 
 modifyConstraints :: ModifyConstraints -> CM ()
-modifyConstraints f = modify $ \cst -> cst { cstCons = f (cstCons cst) }
+modifyConstraints f = modify $ \s -> s { cstCons = f (cstCons s) }
 
 createEmptyConstraint :: Name -> CM ()
 createEmptyConstraint = modifyConstraints . createEmptyConstraint'
@@ -328,7 +326,7 @@ createEmptyConstraint = modifyConstraints . createEmptyConstraint'
 createEmptyConstraint' :: Name -> ModifyConstraints
 createEmptyConstraint' record = Map.insert record emptyRecType
 
-extendRecordConstraint :: Name -> Name -> Type -> CM()
+extendRecordConstraint :: Name -> Name -> Type -> CM ()
 extendRecordConstraint r a t = modifyConstraints $ extendRecordConstraint' r a t
 
 extendRecordConstraint' :: Name -> Name -> Type -> ModifyConstraints
@@ -336,4 +334,10 @@ extendRecordConstraint' recordName attribute t = Map.adjust (addAttribute attrib
 
 addAttribute :: Name -> Type -> RecType -> RecType
 addAttribute = Map.insert
+
+getRecord :: TVar -> CM RecType
+getRecord x = getsConstraints (getRecord' x)
+
+getRecord' :: TVar -> Constraints -> RecType
+getRecord' = flip (Map.!)
 
