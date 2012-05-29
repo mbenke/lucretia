@@ -1,14 +1,14 @@
-module Lucretia.Test(main, tests) where
+module Lucretia.Test (main, tests) where
 import Lucretia.Definitions
 import Lucretia.Syntax
-import Lucretia.Types
-import Lucretia.Interpreter
+import Lucretia.Types hiding (initState)
+import Lucretia.Interpreter (Val (..), runProg, IM, runIM, printState, initState)
 -- import qualified Lucretia.ParsecParser as Parser
 import qualified Lucretia.ApplicativeParser as Parser
 
 import Control.Monad.Error
 import Test.HUnit
-import HUnitUtils(assertEqualShowingDiff, assertIsInfixOf)
+import HUnitUtils (assertEqualShowingDiff, assertIsInfixOf)
 
 luProgramTester :: ProgramText -> CompareResultStrategy -> Test
 

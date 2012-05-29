@@ -8,7 +8,7 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-import Lucretia.TypeChecker.Definitions (Name, Param)
+import Lucretia.TypeChecker.Definitions (Var, TVar)
 
 -- * Types (/Defition 2.1 (Types)/ in wp)
 
@@ -16,8 +16,8 @@ import Lucretia.TypeChecker.Definitions (Name, Param)
 data Type
   = TInt -- ^ @c@ in wp
   | TBool -- ^ @c@ in wp
-  | TVar Name -- ^ @X@ in wp
-  | TRec RecType -- ^ @t_r@ in wp
+  | TVar TVar -- ^ @X@ in wp
+  | TRec Rec -- ^ @t_r@ in wp
   | TOr (Set Type) -- ^ @t_b,1 v t_b,2@ in wp
   | TFieldUndefined -- ^ @_|_@ in wp
   | TFunc Constraints [Type] Type Constraints -- ^ @[t1, …, tn; Psi_1] => [tn+1; \Psi_2]@ in wp
@@ -25,17 +25,17 @@ data Type
 
 -- * Record Type (@t_r = {l : t} | {}@ in wp)
 
--- | A mapping from Field Names to Types.
+-- | Record (models an object). A mapping from field names to Types.
 --
 -- List of pairs @l : t@ in wp.
 --
 -- It is the same type as 'Env'
-type RecType = Map Name Type
+type Rec = Map Var Type
 
-oneFieldTRec :: Name -> Type -> RecType
+oneFieldTRec :: Var -> Type -> Rec
 oneFieldTRec a t = Map.fromList [(a,t)]
 
-emptyRecType :: RecType
+emptyRecType :: Rec
 emptyRecType = Map.empty
 
 
@@ -44,19 +44,19 @@ emptyRecType = Map.empty
 -- | A mapping from Type Variable Names to Record Types.
 --
 -- List of pairs @X <# t_r@ in wp.
-type Constraints = Map Name RecType
+type Constraints = Map TVar Rec
 
 -- * Environment: Variable Names to Types (Sigma in wp)
 
 -- | A mapping from Variable Names to Types.
 --
 -- It is the same type as 'Env'
-type Env = Map Name Type
+type Env = Map Var Type
 
 emptyEnv :: Env
 emptyEnv = Map.empty
 
-extendEnv :: Name -> Type -> Env -> Env
+extendEnv :: Var -> Type -> Env -> Env
 extendEnv x t env = Map.insert x t env
 
 -- * Locations to Type Variable Names (Gamma in wp)
@@ -80,7 +80,7 @@ showConstraints cs = concat ["[",showFields fields,"]"] where
   showFields fields = intercalate ", " (map showField fields)
   showField (l,t) = concat [l," < ", showRec t]
 
-showRec :: RecType -> String 
+showRec :: Rec -> String 
 showRec r = concat ["{",showFields fields,"}"] where
   fields = Map.toList r 
   showFields fields = intercalate ", " (map showField fields)
@@ -94,6 +94,4 @@ instance Show Type where
   show (TOr ts) = intercalate " v " $ map show $ Set.toList ts
   show (TFieldUndefined) = "undefined"
   show (TFunc constraintsBefore paramTypes bodyType constraintsAfter) = "(" ++ showConstraints constraintsBefore ++ " " ++ intercalate " " (map show paramTypes) ++ " -> " ++ show bodyType ++ " " ++ showConstraints constraintsAfter ++ ")"
-
-
 

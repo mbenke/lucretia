@@ -1,27 +1,65 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances, FlexibleContexts #-}
 
 module Lucretia.Types where
 
-import Data.List(intercalate)
-import Data.Map(Map)
+import Data.List (intercalate)
+import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 
-import Lucretia.TypeChecker.Definitions(Name, Param)
+import Lucretia.TypeChecker.Definitions (Var, TVar)
 
+-- * Types (/Defition 2.1 (Types)/ in wp)
+
+-- | @t_b@ /and/ @t@ in wp
 data Type
-  = TInt
-  | TBool
-  | TVar Name
-  | TRec RecType --TODO remove
-  | TOr [Type] --TODO [Type] ~> Set Type
-  | TFieldUndefined
-  | TFunc Constraints [Type] Type Constraints
-  deriving Eq
-type RecType = Map Name Type
-type Constraints = Map Name RecType
+  = TInt -- ^ @c@ in wp
+  | TBool -- ^ @c@ in wp
+  | TVar TVar -- ^ @X@ in wp
+  | TRec Rec -- ^ @t_r@ in wp
+  | TOr (Set Type) -- ^ @t_b,1 v t_b,2@ in wp
+  | TFieldUndefined -- ^ @_|_@ in wp
+  | TFunc Constraints [Type] Type Constraints -- ^ @[t1, …, tn; Psi_1] => [tn+1; \Psi_2]@ in wp
+  deriving (Eq, Ord)
 
-type Env = Map Name Type
+-- * Record Type (@t_r = {l : t} | {}@ in wp)
+
+-- | Record (models an object). A mapping from field names to Types.
+--
+-- List of pairs @l : t@ in wp.
+--
+-- It is the same type as 'Env'
+type Rec = Map Var Type
+
+oneFieldTRec :: Var -> Type -> Rec
+oneFieldTRec a t = Map.fromList [(a,t)]
+
+emptyRecType :: Rec
+emptyRecType = Map.empty
+
+
+-- * Constraints (@Psi@ in wp)
+
+-- | A mapping from Type Variable Names to Record Types.
+--
+-- List of pairs @X <# t_r@ in wp.
+type Constraints = Map TVar Rec
+
+-- * Environment: Variable Names to Types (Sigma in wp)
+
+-- | A mapping from Variable Names to Types.
+--
+-- It is the same type as 'Env'
+type Env = Map Var Type
+
+emptyEnv :: Env
+emptyEnv = Map.empty
+
+extendEnv :: Var -> Type -> Env -> Env
+extendEnv x t env = Map.insert x t env
+
+-- * Locations to Type Variable Names (Gamma in wp)
 
 data CheckState = CheckState { 
   cstCons :: Constraints,
@@ -32,12 +70,17 @@ data CheckState = CheckState {
 instance Show CheckState where
   show cst = showConstraints $ cstCons cst
   
+initState :: CheckState
+initState = CheckState Map.empty [1..]
+  
+-- * Show instance
+
 showConstraints cs = concat ["[",showFields fields,"]"] where
   fields = Map.toList cs
   showFields fields = intercalate ", " (map showField fields)
   showField (l,t) = concat [l," < ", showRec t]
-  
-showRec :: RecType -> String 
+
+showRec :: Rec -> String 
 showRec r = concat ["{",showFields fields,"}"] where
   fields = Map.toList r 
   showFields fields = intercalate ", " (map showField fields)
@@ -48,46 +91,8 @@ instance Show Type where
   show TBool = "bool"
   show (TVar v) = v
   show (TRec r) = showRec r
-  show (TOr ts) = intercalate " v " (map show ts)
+  show (TOr ts) = intercalate " v " $ map show $ Set.toList ts
   show (TFieldUndefined) = "undefined"
   show (TFunc constraintsBefore paramTypes bodyType constraintsAfter) = "(" ++ showConstraints constraintsBefore ++ " " ++ intercalate " " (map show paramTypes) ++ " -> " ++ show bodyType ++ " " ++ showConstraints constraintsAfter ++ ")"
 
-
-
-oneFieldTRec :: Name -> Type -> RecType
-oneFieldTRec a t = Map.fromList [(a,t)]
-
-
-data TypeIso = TypeIso Type Constraints
-data MapNameTypeIso = MapNameTypeIso Env Constraints
-data NameIso = NameIso Name Constraints
-data RecTypeIso = RecTypeIso RecType Constraints
-
-instance Eq MapNameTypeIso where
-  MapNameTypeIso e1 cs1 == MapNameTypeIso e2 cs2 = (toTypeIso e1 cs1) == (toTypeIso e2 cs2)
-    where
-    toTypeIso e cs = Map.map (\t -> TypeIso t cs) e
-
---Why *Iso types? To avoid rewriting the contents of "instance Eq (Map * *)".
-
---TODO introduce state: visited nodes, to avoid non-termination
---Problem with introducing state: how to have a state that is transferred between nodes compared in the code of "instance Eq (Map * *)" without rewriting this code.
-  -- 1. solution (unclean): use global state / global variables
-  -- 2. solution (not really answering above question): rewrite "instance Eq (Map * *)" using fold / State monad
-
-instance Eq TypeIso where
-  TypeIso (TVar n1) cs1 == TypeIso (TVar n2) cs2 = 
-    NameIso n1 cs1 == NameIso n2 cs2
-  TypeIso t1 _ == TypeIso t2 _ = 
-    t1 == t2
-
-instance Eq NameIso where
-  NameIso n1 cs1 == NameIso n2 cs2 = RecTypeIso (cs1 `findOrFail` n1) cs1 == RecTypeIso (cs2 `findOrFail` n2) cs2
-    where
-    cs `findOrFail` n = case Map.lookup n cs of
-			  Just result -> result
-			  Nothing     -> error $ "Cannot find type variable named: " ++ n1 ++ " in constraints: " ++ showConstraints cs ++ "."
-
-instance Eq RecTypeIso where
-  RecTypeIso r1 cs1 == RecTypeIso r2 cs2 = MapNameTypeIso r1 cs1 == MapNameTypeIso r2 cs2
 

@@ -46,7 +46,7 @@ import DebugUtils (traceShowId, traceShowIdHl)
 
 import OrFail (orFail, orFailE)
 
-import Lucretia.TypeChecker.Definitions (Name, Param, Var, TVar)
+import Lucretia.TypeChecker.Definitions (Var, TVar)
 import Lucretia.TypeChecker.Types
 import Lucretia.TypeChecker.Syntax
 import Lucretia.TypeChecker.IsomorphicModuloNames (iso)
@@ -56,31 +56,38 @@ import Lucretia.TypeChecker.IsomorphicModuloNames (iso)
 
 findType :: Env -> Exp -> CM Type
 
--- | Record update (update-old)
+-- Record update (update-old)
 findType env (ESet x a e) = do
   tX <- getTVar env x
   t2 <- findTypeCleanConstraints env e
   extendRecordConstraint tX a t2
   return (TVar tX)
+    where
+    extendRecordConstraint :: Var -> Var -> Type -> CM ()
+    extendRecordConstraint r a t = modifyConstraints $ extendRecordConstraint' r a t
+    
+    extendRecordConstraint' :: Var -> Var -> Type -> ModifyConstraints
+    extendRecordConstraint' recordName attribute t = Map.adjust (addAttribute attribute t) recordName
 
--- | Record access (access)
+
+--  Record access (access)
 findType env (EGet x a) = do
-  let err_a = x ++ "." ++ a
 
-  u <- findFieldType err_a a =<< getRecord =<< getTVar env x
+  u <- findFieldType a =<< getRecord =<< getTVar env x
   {-
   t_X <- getTVar env x
   rec <- getRecord t_X
-  t_u <- findFieldType err_a a rec
+  t_u <- findFieldType a rec
   -}
   doesNotHaveBottom u `orFail` (err_a ++ " may be undefined.")
   return u
     where
-    findFieldType :: Name -- ^ in case of error: pretty name of the field
-                  -> Name -- ^ field
-                  -> RecType -- ^ type of record
+    err_a = x ++ "." ++ a
+
+    findFieldType :: Var -- ^ field
+                  -> Rec -- ^ type of record
     	      -> CM Type -- ^ type of field
-    findFieldType err_a a rec = case Map.lookup a rec of
+    findFieldType a rec = case Map.lookup a rec of
       Nothing -> throwError $ "Unknown field " ++ err_a
       Just t -> return t
     
@@ -89,7 +96,7 @@ findType env (EGet x a) = do
     doesNotHaveBottom (TOr t) = all doesNotHaveBottom t
     doesNotHaveBottom _ = True
 
--- | Conditional instruction (if)
+-- Conditional instruction (if)
 findType env (EIf eIf eThen eElse) = do
   TBool <- findTypeCleanConstraints env eIf
   stateBeforeBody <- get
@@ -105,7 +112,7 @@ findType env (EIf eIf eThen eElse) = do
   put $ mergeStates stateAfterThen stateAfterElse
   return $ mergeTypes tThen tElse
 
--- | Function definition (fdecl)
+-- Function definition (fdecl)
 findType env (EFunc (Func xParams tFunc eBody)) = do
   let TFunc expectedConstraintsBefore tParams expectedU expectedConstraintsAfter = tFunc
   (length xParams == length tParams) `orFail` "Number of arguments and number of their types do not match"
@@ -124,7 +131,7 @@ findType env (EFunc (Func xParams tFunc eBody)) = do
 
   return tFunc --TODO: test eFuncWithUnnecessaryConstraints, tFunc { constraintsAfter = cleanConstraints (Map.fromList [("_", expectedU)] (constraintsAfter tFunc) }
 
--- | Function call (fapp)
+-- Function call (fapp)
 findType env (ECall eFunc eParams) = do
   let funcName = findName env eFunc
 
@@ -147,18 +154,18 @@ findType env (ECall eFunc eParams) = do
   constraintsAreWeakerOrEqualTo :: Constraints -> Constraints -> Bool
   constraintsAreWeakerOrEqualTo = Map.isSubmapOfBy recordIsSmallerOrEqualTo
   
-  recordIsSmallerOrEqualTo :: RecType -> RecType -> Bool
+  recordIsSmallerOrEqualTo :: Rec -> Rec -> Bool
   recordIsSmallerOrEqualTo = Map.isSubmapOf
 
   merge :: Constraints -> Constraints -> Constraints
   merge = Map.unionWith seq
 
--- | Control flow with break instructions (label)
+-- Control flow with break instructions (label)
 -- TODO
--- | Control flow with break instructions (break)
+-- Control flow with break instructions (break)
 -- TODO
 
--- | Let-expression (let)
+-- Let-expression (let)
 findType env (ELet x e1 e0) = do  
   t1 <- findTypeCleanConstraints env e1
   let env' = extendEnv x t1 env
@@ -166,24 +173,24 @@ findType env (ELet x e1 e0) = do
 findType env (ELets [] e0) = findTypeCleanConstraints env e0
 findType env (ELets ((x,e):ds) e0) = findTypeCleanConstraints env (ELet x e (ELets ds e0))
 
--- | Object creation (new)
+-- Object creation (new)
 findType env ENew = do
   t <- freshTVar
   createEmptyConstraint t
   return $ TVar t
 
--- | Other rules, not mentioned in the white paper
+-- Other rules, not mentioned in the white paper
 findType env (EVar x) = getType env x 
 findType env (EInt _) = return TInt
 findType env EBoolTrue = return TBool
 findType env EBoolFalse = return TBool
 
-getTVar :: Env -> Name -> CM TVar
+getTVar :: Env -> TVar -> CM TVar
 getTVar env x = unpack =<< getType env x
   where unpack (TVar tVar) = return tVar
 	unpack t = throwError $ "Variable " ++ x ++ ": type mismatch: expected record type, but got " ++ show t ++ "."
 
-getType :: Env -> Name -> CM Type
+getType :: Env -> Var -> CM Type
 getType env x = case Map.lookup x env of
   Nothing -> throwError $ "Unknown variable " ++ x
   Just t -> return t
@@ -191,7 +198,7 @@ getType env x = case Map.lookup x env of
 
 -- ** Helper functions
 
-findName :: Env -> Exp -> Name
+findName :: Env -> Exp -> Var
 findName env (EVar x) = x
 findName env _ = "(anonymous)"
   
@@ -214,7 +221,7 @@ mergeCons :: Constraints -> Constraints -> Constraints
 mergeCons = Map.unionWith mergeRecTypes
 
 -- | Merge RecTypes, @Bishop@ relation in wp.
-mergeRecTypes :: RecType -> RecType -> RecType
+mergeRecTypes :: Rec -> Rec -> Rec
 mergeRecTypes r1 r2 = 
   intersection `Map.union` rest
     where
@@ -247,10 +254,10 @@ findTypeCleanConstraints env e = do
 cleanConstraints :: Env -> Type -> Constraints -> Constraints
 cleanConstraints env returnType inputCs = foldl addConstraintsForName Map.empty tVarsNeededInEnv
   where
-  tVarsNeededInEnv :: [Name]
+  tVarsNeededInEnv :: [TVar]
   tVarsNeededInEnv = filterTVars $ returnType : Map.elems env
 
-  addConstraintsForName :: Constraints -> Name -> Constraints
+  addConstraintsForName :: Constraints -> TVar -> Constraints
   addConstraintsForName neededCsAcc neededTVarName
     | neededTVarName `Map.member` neededCsAcc = neededCsAcc
     | otherwise = foldl addConstraintsForName neededCsAccIncreased tVarsNeededInNeededTVar
@@ -259,7 +266,7 @@ cleanConstraints env returnType inputCs = foldl addConstraintsForName Map.empty 
     tVarsNeededInNeededTVar = filterTVars $ Map.elems neededTVarType
     neededCsAccIncreased = Map.insert neededTVarName neededTVarType neededCsAcc
 
-  filterTVars :: [Type] -> [Name]
+  filterTVars :: [Type] -> [TVar]
   filterTVars = map (\(TVar n) -> n) . filter isTVar
     where
       isTVar (TVar _) = True
@@ -285,10 +292,10 @@ isRight (Left  _) = False
 
 -- ** Fresh variables (… in wp)
 
--- | Get fresh Type Variable Name
+-- | Get fresh 'TVar'
 freshTVar = freshName "X"
 
--- | Get fresh Type Variable Name with given prefix
+-- | Get fresh variable name with given prefix
 freshName :: String -- ^ prefix
           -> CM String
 freshName prefix = do 
@@ -320,24 +327,18 @@ type ModifyConstraints = Constraints -> Constraints
 modifyConstraints :: ModifyConstraints -> CM ()
 modifyConstraints f = modify $ \s -> s { cstCons = f (cstCons s) }
 
-createEmptyConstraint :: Name -> CM ()
+createEmptyConstraint :: TVar -> CM ()
 createEmptyConstraint = modifyConstraints . createEmptyConstraint'
 
-createEmptyConstraint' :: Name -> ModifyConstraints
+createEmptyConstraint' :: TVar -> ModifyConstraints
 createEmptyConstraint' record = Map.insert record emptyRecType
 
-extendRecordConstraint :: Name -> Name -> Type -> CM ()
-extendRecordConstraint r a t = modifyConstraints $ extendRecordConstraint' r a t
-
-extendRecordConstraint' :: Name -> Name -> Type -> ModifyConstraints
-extendRecordConstraint' recordName attribute t = Map.adjust (addAttribute attribute t) recordName
-
-addAttribute :: Name -> Type -> RecType -> RecType
+addAttribute :: Var -> Type -> Rec -> Rec
 addAttribute = Map.insert
 
-getRecord :: TVar -> CM RecType
+getRecord :: TVar -> CM Rec
 getRecord x = getsConstraints (getRecord' x)
 
-getRecord' :: TVar -> Constraints -> RecType
+getRecord' :: TVar -> Constraints -> Rec
 getRecord' = flip (Map.!)
 

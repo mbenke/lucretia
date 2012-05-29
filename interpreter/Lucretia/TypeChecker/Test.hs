@@ -7,9 +7,9 @@ import Test.HUnit
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import HUnitUtils(assertEqualShowingDiff)
+import HUnitUtils (assertEqualShowingDiff)
 
-import Lucretia.TypeChecker.Main(checkProg, runCheck)
+import Lucretia.TypeChecker.Main (checkProg, runCheck)
 import Lucretia.TypeChecker.Syntax
 import Lucretia.TypeChecker.Types
 
