@@ -48,7 +48,7 @@ import OrFail (orFail, orFailE)
 
 import Lucretia.Definitions (Var, TVar)
 import Lucretia.Types
-import Lucretia.TypeChecker.Syntax
+import Lucretia.Syntax
 import Lucretia.TypeChecker.IsomorphicModuloNames (iso)
 
 
