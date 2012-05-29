@@ -31,8 +31,8 @@ import Data.Function (on)
 
 import Data.List (permutations)
 
-import Lucretia.TypeChecker.Definitions (Var, TVar)
-import Lucretia.TypeChecker.Types
+import Lucretia.Definitions (Var, TVar)
+import Lucretia.Types
 
 import LocalState (localState_)
 

@@ -8,7 +8,7 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-import Lucretia.TypeChecker.Definitions (Var, TVar)
+import Lucretia.Definitions (Var, TVar)
 
 -- * Types (/Defition 2.1 (Types)/ in wp)
 

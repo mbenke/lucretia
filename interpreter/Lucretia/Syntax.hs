@@ -1,29 +1,29 @@
 module Lucretia.Syntax where
 
 import Lucretia.Types
-import Lucretia.Definitions (Name, Param)
+import Lucretia.Definitions (Var, Label, Param)
 
 type Program = Defs
 type Defs = [Def]
-type Def = (Name, Exp)
+type Def = (Var, Exp)
 
-data Exp
+data Exp 
     = EInt Integer
     | EBoolTrue
     | EBoolFalse
     | ENone
 
-    | EVar Name
-    | ELet Name Exp Exp
+    | EVar Var
+    | ELet Var Exp Exp
     | ELets Defs Exp
     | EIf Exp Exp Exp
     | ENew
 
-    | EGet Name Name
-    | ESet Name Name Exp
-    | ELabel Name Exp --Type
-    | EBreak Name Exp --Type
-    | EFunc Func --Type
+    | EGet Var Var
+    | ESet Var Var Exp
+    | ELabel Label Exp
+    | EBreak Label Exp
+    | EFunc Func
     | ECall Exp [Exp]
 
     | EAdd Exp Exp
@@ -45,4 +45,5 @@ instance Num Exp where
 
 programFromExp :: Exp -> Program
 programFromExp e = [("_",e)]
+
 

@@ -12,7 +12,7 @@
 --
 -- /2. Model language and its semantics/
 --
--- * Definiton 2.1 (Types) @->@ "Lucretia.TypeChecker.Types"
+-- * Definiton 2.1 (Types) @->@ "Lucretia.Types"
 --
 -- * Figure 1: Syntax of lambda_M @->@ "Lucretia.Syntax"
 --
@@ -46,8 +46,8 @@ import DebugUtils (traceShowId, traceShowIdHl)
 
 import OrFail (orFail, orFailE)
 
-import Lucretia.TypeChecker.Definitions (Var, TVar)
-import Lucretia.TypeChecker.Types
+import Lucretia.Definitions (Var, TVar)
+import Lucretia.Types
 import Lucretia.TypeChecker.Syntax
 import Lucretia.TypeChecker.IsomorphicModuloNames (iso)
 

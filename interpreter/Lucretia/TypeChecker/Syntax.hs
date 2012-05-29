@@ -1,7 +1,7 @@
 module Lucretia.TypeChecker.Syntax where
 
-import Lucretia.TypeChecker.Types
-import Lucretia.TypeChecker.Definitions(Var, Label, Param)
+import Lucretia.Types
+import Lucretia.Definitions (Var, Label, Param)
 
 type Program = Defs
 type Defs = [Def]

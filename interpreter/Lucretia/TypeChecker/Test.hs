@@ -11,7 +11,7 @@ import HUnitUtils (assertEqualShowingDiff)
 
 import Lucretia.TypeChecker.Main (checkProg, runCheck)
 import Lucretia.TypeChecker.Syntax
-import Lucretia.TypeChecker.Types
+import Lucretia.Types
 
 #define VARIABLE_NAME(variable) ("variable", variable)
 
