@@ -18,7 +18,7 @@
 --
 -- * Figure 2: Semantic rules of lambda_M @->@ "Lucretia.Interpreter"
 --
--- /3. The type system/ @->@ "Lucretia.TypeChecker.Main" (this module)
+-- /3. The type system/ @->@ "Lucretia.TypeChecker.TypeChecker" (this module)
 --
 -- /4. Properties of the type system/
 -- 
@@ -27,8 +27,8 @@
 -- /6. Conclusions and future work/
 --
 -----------------------------------------------------------------------------
---module Lucretia.TypeChecker.Main (runCheck, checkProg) where
-module Lucretia.TypeChecker.Main where
+--module Lucretia.TypeChecker.TypeChecker (runCheck, checkProg) where
+module Lucretia.TypeChecker.TypeChecker where
 
 import Prelude hiding (all)
 

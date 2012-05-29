@@ -13,7 +13,7 @@ executable lucre
   main-is: lucre.hs
   other-modules: Lucretia.ApplicativeParser, Lucretia.Definitions, 
     Lucretia.Syntax, Lucretia.Exception, Lucretia.Interpreter,
-    Lucretia.Types, Lucretia.TypeChecker.Definitions
+    Lucretia.Types
 
 executable Test
   build-depends: 
@@ -21,12 +21,12 @@ executable Test
     process
   main-is: Test.hs
   other-modules: Lucretia.ApplicativeParser, Lucretia.Definitions, 
-    Lucretia.Syntax, Lucretia.Exception, Lucretia.Interpreter,
+    Lucretia.Interpreter,
+    Lucretia.Exception,
+    Lucretia.Definitions,
+    Lucretia.Syntax,
     Lucretia.Types, 
-    Lucretia.TypeChecker.Definitions,
+    Lucretia.TypeChecker.TypeChecker,
     Lucretia.TypeChecker.IsomorphicModuloNames,
-    Lucretia.TypeChecker.Main,
-    Lucretia.TypeChecker.Syntax,
     Lucretia.TypeChecker.Test,
-    Lucretia.TypeChecker.Types,
     DebugUtils, Diff, HUnitUtils, LocalState, OrFail

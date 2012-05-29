@@ -9,7 +9,7 @@ import qualified Data.Set as Set
 
 import HUnitUtils (assertEqualShowingDiff)
 
-import Lucretia.TypeChecker.Main (checkProg, runCheck)
+import Lucretia.TypeChecker.TypeChecker (checkProg, runCheck)
 import Lucretia.Syntax
 import Lucretia.Types
 
