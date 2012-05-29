@@ -79,16 +79,16 @@ findType env (EGet x a) = do
   rec <- getRecord t_X
   t_u <- findFieldType a rec
   -}
-  doesNotHaveBottom u `orFail` (err_a ++ " may be undefined.")
+  doesNotHaveBottom u `orFail` (err_a++" may be undefined.")
   return u
     where
-    err_a = x ++ "." ++ a
+    err_a = x++"."++a
 
     findFieldType :: Var -- ^ field
                   -> Rec -- ^ type of record
     	      -> CM Type -- ^ type of field
     findFieldType a rec = case Map.lookup a rec of
-      Nothing -> throwError $ "Unknown field " ++ err_a
+      Nothing -> throwError $ "Unknown field "++err_a
       Just t -> return t
     
     doesNotHaveBottom :: Type -> Bool
@@ -109,8 +109,10 @@ findType env (EIf eIf eThen eElse) = do
   tElse <- findTypeCleanConstraints env eElse
   stateAfterElse <- get
 
+  (tThen == tElse) `orFail` ("Type after then: "++show tThen++" doesn't match type after else"++show tElse++".")
+
   put $ mergeStates stateAfterThen stateAfterElse
-  return $ mergeTypes tThen tElse
+  return tThen
 
 -- Function definition (fdecl)
 findType env (EFunc (Func xParams tFunc eBody)) = do
@@ -123,9 +125,9 @@ findType env (EFunc (Func xParams tFunc eBody)) = do
   putConstraints expectedConstraintsBefore
   u <- findTypeCleanConstraints extendedEnv eBody
   actualConstraintsAfter <- getConstraints
-  iso (expectedU, expectedConstraintsAfter) (u, actualConstraintsAfter) `orFailE` ("Type and associated constraints after type-checking method body: " ++ show u ++ ", " ++ showConstraints actualConstraintsAfter ++ " are not the same as declared in the signature: " ++ show expectedU ++ ", " ++ showConstraints expectedConstraintsAfter ++ ".\n")
+  iso (expectedU, expectedConstraintsAfter) (u, actualConstraintsAfter) `orFailE` ("Type and associated constraints after type-checking method body: "++show u++", "++showConstraints actualConstraintsAfter++" are not the same as declared in the signature: "++show expectedU++", "++showConstraints expectedConstraintsAfter++".\n")
   --TODO maybe this:
-  --(actualConstraintsAfter `areAtLeastThatStrongAs` expectedConstraintsAfter) `orFail` ("Returned value should match at least all the constraints that are declared in the signature of function " ++ funcName ++ ".")
+  --(actualConstraintsAfter `areAtLeastThatStrongAs` expectedConstraintsAfter) `orFail` ("Returned value should match at least all the constraints that are declared in the signature of function "++funcName++".")
 
   putConstraints constraintsBeforeBody
 
@@ -137,13 +139,13 @@ findType env (ECall eFunc eParams) = do
 
   tFunc <- findTypeCleanConstraints env eFunc
   let TFunc expectedConstraintsBefore tParams tBody expectedConstraintsAfter = tFunc
-  (length eParams == length tParams) `orFail` ("Function " ++ funcName ++ " is applied to " ++ show (length eParams) ++ " parameters, but " ++ show (length tParams) ++ " parameters should be provided.\n")
+  (length eParams == length tParams) `orFail` ("Function "++funcName++" is applied to "++show (length eParams)++" parameters, but "++show (length tParams)++" parameters should be provided.\n")
   
   tParamsActual <- mapM (findTypeCleanConstraints env) eParams
-  (tParams == tParamsActual) `orFail` ("Types of parameters should be " ++ show tParams ++ " but are " ++ show tParamsActual ++ ".\n")
+  (tParams == tParamsActual) `orFail` ("Types of parameters should be "++show tParams++" but are "++show tParamsActual++".\n")
 
   actualConstraintsBeforeBody <- getConstraints
-  (expectedConstraintsBefore `constraintsAreWeakerOrEqualTo` actualConstraintsBeforeBody) `orFail` ("Constraints before calling function " ++ funcName ++ ": " ++ showConstraints actualConstraintsBeforeBody ++ " are not that strong as pre-constraints in the function definition: " ++ showConstraints expectedConstraintsBefore ++ ".\n")
+  (expectedConstraintsBefore `constraintsAreWeakerOrEqualTo` actualConstraintsBeforeBody) `orFail` ("Constraints before calling function "++funcName++": "++showConstraints actualConstraintsBeforeBody++" are not that strong as pre-constraints in the function definition: "++showConstraints expectedConstraintsBefore++".\n")
 
   putConstraints $ actualConstraintsBeforeBody `merge` expectedConstraintsAfter
 
@@ -188,11 +190,11 @@ findType env EBoolFalse = return TBool
 getTVar :: Env -> TVar -> CM TVar
 getTVar env x = unpack =<< getType env x
   where unpack (TVar tVar) = return tVar
-	unpack t = throwError $ "Variable " ++ x ++ ": type mismatch: expected record type, but got " ++ show t ++ "."
+	unpack t = throwError $ "Variable "++x++": type mismatch: expected record type, but got "++show t++"."
 
 getType :: Env -> Var -> CM Type
 getType env x = case Map.lookup x env of
-  Nothing -> throwError $ "Unknown variable " ++ x
+  Nothing -> throwError $ "Unknown variable "++x
   Just t -> return t
 
 
@@ -300,7 +302,7 @@ freshName :: String -- ^ prefix
           -> CM String
 freshName prefix = do 
   i <- freshInt
-  return $ prefix ++ show i
+  return $ prefix++show i
 
 -- | Get next fresh Int
 freshInt :: CM Int
