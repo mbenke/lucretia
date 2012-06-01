@@ -1,7 +1,7 @@
 module Lucretia.Syntax where
 
 import Lucretia.Types
-import Lucretia.Definitions (Var, Label, Param)
+import Lucretia.Definitions (Var, Field, Label, Param)
 
 type Program = Defs
 type Defs = [Def]
@@ -17,10 +17,11 @@ data Exp
     | ELet Var Exp Exp
     | ELets Defs Exp
     | EIf Exp Exp Exp
+    | EIfHasAttr Var Field Exp Exp
     | ENew
 
-    | EGet Var Var
-    | ESet Var Var Exp
+    | EGet Var Field
+    | ESet Var Field Exp
     | ELabel Label Exp
     | EBreak Label Exp
     | EFunc Func

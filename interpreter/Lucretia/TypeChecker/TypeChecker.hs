@@ -46,7 +46,7 @@ import DebugUtils (traceShowId, traceShowIdHl)
 
 import OrFail (orFail, orFailE)
 
-import Lucretia.Definitions (Var, TVar)
+import Lucretia.Definitions (Var, Field, TVar)
 import Lucretia.Types
 import Lucretia.Syntax
 import Lucretia.TypeChecker.IsomorphicModuloNames (iso)
@@ -97,22 +97,78 @@ findType env (EGet x a) = do
     doesNotHaveBottom _ = True
 
 -- Conditional instruction (if)
-findType env (EIf eIf eThen eElse) = do
+findType env i@(EIf eIf eThen eElse) = do
   TBool <- findTypeCleanConstraints env eIf
   stateBeforeBody <- get
   
-  put stateBeforeBody
   tThen <- findTypeCleanConstraints env eThen
   stateAfterThen <- get
   
   put stateBeforeBody
+
   tElse <- findTypeCleanConstraints env eElse
   stateAfterElse <- get
 
-  (tThen == tElse) `orFail` ("Type after then: "++show tThen++" doesn't match type after else"++show tElse++".")
+  (tThen == tElse) `orFail` ("Type after then: "++show tThen++" does not match type after else: "++show tElse++". In "++show i)
 
   put $ mergeStates stateAfterThen stateAfterElse
   return tThen
+
+-- Object structure introspection (ifhasattr)
+findType env i@(EIfHasAttr x a eThen eElse) = do
+  stateBeforeBody <- get
+  
+  assumeContains a x
+  tThen <- findTypeCleanConstraints env eThen
+  stateAfterThen <- get
+  
+  put stateBeforeBody
+
+  tElse <- findTypeCleanConstraints env eElse
+  stateAfterElse <- get
+
+  (tThen == tElse) `orFail` ("Type after then: "++show tThen++" does not match type after else: "++show tElse++". In "++show i)
+
+  put $ mergeStates stateAfterThen stateAfterElse
+  return tThen
+    where
+    assumeContains :: Field -> Var -> CM ()
+    assumeContains a x = modifyRec (assumeContains' a) =<< contains a =<< getTVar env x
+
+    contains :: Field -> TVar -> CM TVar
+    contains a tvar = do
+      cs <- getConstraints
+      let rec = cs Map.! tvar
+      Map.member a rec `orFail` ("Record "++showRec rec++" does not contain field "++a)
+      return tvar
+
+    modifyRec :: (Rec -> Rec) -> TVar -> CM ()
+    modifyRec f tvar = modifyConstraints $ Map.adjust f tvar
+
+    assumeContains' :: Field -> Rec -> Rec
+    assumeContains' = Map.adjust removeBottom
+
+    removeBottom :: Type -- ^ Note that TFieldUndefined can be here only as
+                         -- a part (one alternative) of TOr
+		 -> Type
+    removeBottom (TOr t) = mkTOr $ Set.filter (/= TFieldUndefined) t
+    removeBottom t = t
+
+    -- | Creates TOr type from Set of Types.
+    -- Takes care of case when the set is a singleton.
+    mkTOr :: Set.Set Type -> Type
+    mkTOr s
+      | Set.size s == 1 = (head . Set.toList) s
+      | otherwise       = TOr s
+
+      -- co jesli x.a niezdef? A: error musi byc chociaz szansa ze x.a jest
+      --jak mam modelowac wartosci typu int z Pythona? jako rekord?
+
+-- Variable and location access (v-access)
+findType env (EVar x) = getType env x 
+
+-- Variable and location access (l-access)
+-- TODO
 
 -- Function definition (fdecl)
 findType env (EFunc (Func xParams tFunc eBody)) = do
@@ -182,7 +238,6 @@ findType env ENew = do
   return $ TVar t
 
 -- Other rules, not mentioned in the white paper
-findType env (EVar x) = getType env x 
 findType env (EInt _) = return TInt
 findType env EBoolTrue = return TBool
 findType env EBoolFalse = return TBool
