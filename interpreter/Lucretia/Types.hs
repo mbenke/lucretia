@@ -8,10 +8,13 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-import Lucretia.Definitions (Var, TVar)
+import Lucretia.Definitions (Var, TVar, Field)
 
-import Data.Lens
+import Data.Lens (Lens, mapLens, getL)
 import Data.Lens.Template (makeLens)
+import Prelude hiding ((.))
+import Control.Category ((.))
+import MapLenses (mapInsertLens)
 
 -- * Types (/Defition 2.1 (Types)/ in wp)
 
@@ -33,9 +36,9 @@ data Type
 -- List of pairs @l : t@ in wp.
 --
 -- It is the same type as 'Env'
-type Rec = Map Var Type
+type Rec = Map Field Type
 
-oneFieldTRec :: Var -> Type -> Rec
+oneFieldTRec :: Field -> Type -> Rec
 oneFieldTRec a t = Map.fromList [(a,t)]
 
 emptyRecType :: Rec
@@ -70,16 +73,24 @@ data CheckState = CheckState {
 }
   deriving Eq
 
+initState :: CheckState
+initState = CheckState Map.empty [1..]
+  
+-- * Lenses
+
 $(makeLens ''CheckState)
+
+record :: TVar -> Lens CheckState Rec
+record v = mapInsertLens v . constraints
+
+field :: Field -> TVar -> Lens CheckState (Maybe Type)
+field a v = mapLens a . record v
+
+-- * Show instance
 
 instance Show CheckState where
   show = showConstraints . getL constraints
   
-initState :: CheckState
-initState = CheckState Map.empty [1..]
-  
--- * Show instance
-
 showConstraints cs = concat ["[",showFields fields,"]"] where
   fields = Map.toList cs
   showFields fields = intercalate ", " (map showField fields)

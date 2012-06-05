@@ -28,7 +28,7 @@ outputTypeTestsData = [
   -- Record access (access)
   (VARIABLE_NAME(eGet_noVar), "Left \"Unknown variable foo\""),
   (VARIABLE_NAME(eGet_varNotRec), "Left \"Variable foo: type mismatch: expected record type, but got bool.\""),
-  (VARIABLE_NAME(eGet_wrongField), "Left \"Unknown field foo.a\""),
+  (VARIABLE_NAME(eGet_wrongField), "Left \"Record {} does not contain field a\""),
 
   (VARIABLE_NAME(eRecordWithOneField), "Right (X1,[X1 < {a:int}])"),
   (VARIABLE_NAME(eRecordWithManyFields), "Right (X1,[X1 < {a:int, b:int, c:int}])"),

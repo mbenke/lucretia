@@ -30,7 +30,7 @@
 --module Lucretia.TypeChecker.TypeChecker (runCheck, checkProg) where
 module Lucretia.TypeChecker.TypeChecker where
 
-import Prelude hiding (all, (.))
+import Prelude hiding (all)
 
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -39,8 +39,6 @@ import qualified Data.Set as Set
 import Data.Foldable (all)
 
 import Data.Lens hiding (iso)
-
-import Control.Category ((.))
 
 import Control.Monad.Error
 import Control.Monad.State
@@ -60,23 +58,6 @@ import Lucretia.TypeChecker.IsomorphicModuloNames (iso)
 
 findType :: Env -> Exp -> CM Type
 
--- * Lenses
-
--- | A lens that:
---
--- * for setter: does not allow to delete @k@ from the map
---
--- * for getter: assumes that @k@ is present in the map
---
-mapInsertLens :: Ord k => k -> Lens (Map k v) v
-mapInsertLens k = lens (\m -> m Map.! k) (Map.insert k)
-
-record :: TVar -> Lens CheckState Rec
-record v = mapInsertLens v . constraints
-
-field :: Field -> TVar -> Lens CheckState (Maybe Type)
-field a v = mapLens a . record v
-
 -- Record update (update-old)
 findType env (ESet x a e) = do
   tX <- getTVar env x
@@ -87,25 +68,11 @@ findType env (ESet x a e) = do
 
 --  Record access (access)
 findType env (EGet x a) = do
-
-  u <- findFieldType a =<< getRecord =<< getTVar env x
-  {-
-  t_X <- getTVar env x
-  rec <- getRecord t_X
-  t_u <- findFieldType a rec
-  -}
-  doesNotHaveBottom u `orFail` (err_a++" may be undefined.")
+  v <- getTVar env x
+  u <- accessField a v
+  doesNotHaveBottom u `orFail` (x++"."++a++" may be undefined.")
   return u
     where
-    err_a = x++"."++a
-
-    findFieldType :: Var -- ^ field
-                  -> Rec -- ^ type of record
-    	      -> CM Type -- ^ type of field
-    findFieldType a rec = case Map.lookup a rec of
-      Nothing -> throwError $ "Unknown field "++err_a
-      Just t -> return t
-    
     doesNotHaveBottom :: Type -> Bool
     doesNotHaveBottom TFieldUndefined = False
     doesNotHaveBottom (TOr t) = all doesNotHaveBottom t
@@ -153,18 +120,6 @@ findType env i@(EIfHasAttr x a eThen eElse) = do
       contains a v
       field a v %= liftM removeBottom
 
-    -- | Could have been refactored using Lenses supporting MonadError
-    --
-    -- TODO OPT: write a library for Lenses using MonadError
-    --
-    contains :: Field -> TVar -> CM ()
-    contains a tvar = do
-      aValue <- access $ field a tvar
-      rec <- access $ record tvar
-      case aValue of
-	Nothing -> throwError $ "Record "++showRec rec++" does not contain field "++a
-	_ -> return ()
-
     removeBottom :: Type -- ^ Note that TFieldUndefined can be here only as
                          -- a part (one alternative) of TOr
 		 -> Type
@@ -193,16 +148,16 @@ findType env (EFunc (Func xParams tFunc eBody)) = do
   (length xParams == length tParams) `orFail` "Number of arguments and number of their types do not match"
   let params = zip xParams tParams
   let extendedEnv = foldl (\envAccumulator (eXi, tXi) -> Map.insert eXi tXi envAccumulator) env params
-  constraintsBeforeBody <- getConstraints
+  constraintsBeforeBody <- access constraints
 
-  putConstraints expectedConstraintsBefore
+  constraints ~= expectedConstraintsBefore
   u <- findTypeCleanConstraints extendedEnv eBody
-  actualConstraintsAfter <- getConstraints
+  actualConstraintsAfter <- access constraints
   iso (expectedU, expectedConstraintsAfter) (u, actualConstraintsAfter) `orFailE` ("Type and associated constraints after type-checking method body: "++show u++", "++showConstraints actualConstraintsAfter++" are not the same as declared in the signature: "++show expectedU++", "++showConstraints expectedConstraintsAfter++".\n")
   --TODO maybe this:
   --(actualConstraintsAfter `areAtLeastThatStrongAs` expectedConstraintsAfter) `orFail` ("Returned value should match at least all the constraints that are declared in the signature of function "++funcName++".")
 
-  putConstraints constraintsBeforeBody
+  constraints ~= constraintsBeforeBody
 
   return tFunc --TODO: test eFuncWithUnnecessaryConstraints, tFunc { constraintsAfter = cleanConstraints (Map.fromList [("_", expectedU)] (constraintsAfter tFunc) }
 
@@ -217,10 +172,10 @@ findType env (ECall eFunc eParams) = do
   tParamsActual <- mapM (findTypeCleanConstraints env) eParams
   (tParams == tParamsActual) `orFail` ("Types of parameters should be "++show tParams++" but are "++show tParamsActual++".\n")
 
-  actualConstraintsBeforeBody <- getConstraints
+  actualConstraintsBeforeBody <- access constraints
   (expectedConstraintsBefore `constraintsAreWeakerOrEqualTo` actualConstraintsBeforeBody) `orFail` ("Constraints before calling function "++funcName++": "++showConstraints actualConstraintsBeforeBody++" are not that strong as pre-constraints in the function definition: "++showConstraints expectedConstraintsBefore++".\n")
 
-  putConstraints $ actualConstraintsBeforeBody `merge` expectedConstraintsAfter
+  constraints ~= actualConstraintsBeforeBody `merge` expectedConstraintsAfter
 
   return tBody
 
@@ -250,9 +205,9 @@ findType env (ELets ((x,e):ds) e0) = findTypeCleanConstraints env (ELet x e (ELe
 
 -- Object creation (new)
 findType env ENew = do
-  t <- freshTVar
-  createEmptyConstraint t
-  return $ TVar t
+  v <- freshTVar
+  record v ~= emptyRecType
+  return $ TVar v
 
 -- Other rules, not mentioned in the white paper
 findType env (EInt _) = return TInt
@@ -275,6 +230,24 @@ getType env x = case Map.lookup x env of
 findName :: Env -> Exp -> Var
 findName env (EVar x) = x
 findName env _ = "(anonymous)"
+
+-- | Could have been refactored using Lenses supporting MonadError
+--
+-- TODO OPT: write a library for Lenses using MonadError
+--
+contains :: Field -> TVar -> CM ()
+contains a tvar = do
+  aValue <- access $ field a tvar
+  rec <- access $ record tvar
+  case aValue of
+	Nothing -> throwError $ "Record "++showRec rec++" does not contain field "++a
+	_ -> return ()
+
+accessField :: Field -> TVar -> CM Type
+accessField a v = do
+  contains a v
+  Just u <- access $ field a v
+  return u
   
 -- ** Merging functions (@Bishop@ relation in /Conditional instruction/ in wp)
 
@@ -382,33 +355,4 @@ freshInt = do
   ints <- access freshInts
   freshInts ~= tail ints
   return $ head ints
-  
--- ** Constraints
-
-getConstraints :: CM Constraints
-getConstraints = gets _constraints
-
-putConstraints :: Constraints -> CM ()
-putConstraints constraints =
-  modify $ \state -> state { _constraints = constraints } 
-
-getsConstraints :: (Constraints -> a) -> CM a
-getsConstraints f = fmap f getConstraints
-
-type ModifyConstraints = Constraints -> Constraints
-
-modifyConstraints :: ModifyConstraints -> CM ()
-modifyConstraints f = constraints %= f >> return ()
-
-createEmptyConstraint :: TVar -> CM Rec
-createEmptyConstraint v = record v ~= emptyRecType
-
-addAttribute :: Var -> Type -> Rec -> Rec
-addAttribute = Map.insert
-
-getRecord :: TVar -> CM Rec
-getRecord x = getsConstraints (getRecord' x)
-
-getRecord' :: TVar -> Constraints -> Rec
-getRecord' = flip (Map.!)
 
