@@ -214,6 +214,8 @@ findType env (EInt _) = return TInt
 findType env EBoolTrue = return TBool
 findType env EBoolFalse = return TBool
 
+-- ** Helper functions
+
 getTVar :: Env -> TVar -> CM TVar
 getTVar env x = unpack =<< getType env x
   where unpack (TVar tVar) = return tVar
@@ -223,9 +225,6 @@ getType :: Env -> Var -> CM Type
 getType env x = case Map.lookup x env of
   Nothing -> throwError $ "Unknown variable "++x
   Just t -> return t
-
-
--- ** Helper functions
 
 findName :: Env -> Exp -> Var
 findName env (EVar x) = x

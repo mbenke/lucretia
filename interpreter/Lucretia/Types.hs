@@ -63,7 +63,7 @@ emptyEnv :: Env
 emptyEnv = Map.empty
 
 extendEnv :: Var -> Type -> Env -> Env
-extendEnv x t env = Map.insert x t env
+extendEnv = Map.insert
 
 -- * Locations to Type Variable Names (Gamma in wp)
 
