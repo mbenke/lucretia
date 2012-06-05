@@ -30,13 +30,17 @@
 --module Lucretia.TypeChecker.TypeChecker (runCheck, checkProg) where
 module Lucretia.TypeChecker.TypeChecker where
 
-import Prelude hiding (all)
+import Prelude hiding (all, (.))
 
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Foldable (all)
+
+import Data.Lens hiding (iso)
+
+import Control.Category ((.))
 
 import Control.Monad.Error
 import Control.Monad.State
@@ -56,19 +60,30 @@ import Lucretia.TypeChecker.IsomorphicModuloNames (iso)
 
 findType :: Env -> Exp -> CM Type
 
+-- * Lenses
+
+-- | A lens that:
+--
+-- * for setter: does not allow to delete @k@ from the map
+--
+-- * for getter: assumes that @k@ is present in the map
+--
+mapInsertLens :: Ord k => k -> Lens (Map k v) v
+mapInsertLens k = lens (\m -> m Map.! k) (Map.insert k)
+
+record :: TVar -> Lens CheckState Rec
+record v = mapInsertLens v . constraints
+
+field :: Field -> TVar -> Lens CheckState (Maybe Type)
+field a v = mapLens a . record v
+
 -- Record update (update-old)
 findType env (ESet x a e) = do
   tX <- getTVar env x
   t2 <- findTypeCleanConstraints env e
-  extendRecordConstraint tX a t2
+  field a tX ~= Just t2
   return (TVar tX)
     where
-    extendRecordConstraint :: Var -> Var -> Type -> CM ()
-    extendRecordConstraint r a t = modifyConstraints $ extendRecordConstraint' r a t
-    
-    extendRecordConstraint' :: Var -> Var -> Type -> ModifyConstraints
-    extendRecordConstraint' recordName attribute t = Map.adjust (addAttribute attribute t) recordName
-
 
 --  Record access (access)
 findType env (EGet x a) = do
@@ -132,21 +147,23 @@ findType env i@(EIfHasAttr x a eThen eElse) = do
   put $ mergeStates stateAfterThen stateAfterElse
   return tThen
     where
-    assumeContains :: Field -> Var -> CM ()
-    assumeContains a x = modifyRec (assumeContains' a) =<< contains a =<< getTVar env x
+    assumeContains :: Field -> Var -> CM (Maybe Type)
+    assumeContains a x = do
+      v <- getTVar env x
+      contains a v
+      field a v %= liftM removeBottom
 
-    contains :: Field -> TVar -> CM TVar
+    -- | Could have been refactored using Lenses supporting MonadError
+    --
+    -- TODO OPT: write a library for Lenses using MonadError
+    --
+    contains :: Field -> TVar -> CM ()
     contains a tvar = do
-      cs <- getConstraints
-      let rec = cs Map.! tvar
-      Map.member a rec `orFail` ("Record "++showRec rec++" does not contain field "++a)
-      return tvar
-
-    modifyRec :: (Rec -> Rec) -> TVar -> CM ()
-    modifyRec f tvar = modifyConstraints $ Map.adjust f tvar
-
-    assumeContains' :: Field -> Rec -> Rec
-    assumeContains' = Map.adjust removeBottom
+      aValue <- access $ field a tvar
+      rec <- access $ record tvar
+      case aValue of
+	Nothing -> throwError $ "Record "++showRec rec++" does not contain field "++a
+	_ -> return ()
 
     removeBottom :: Type -- ^ Note that TFieldUndefined can be here only as
                          -- a part (one alternative) of TOr
@@ -263,8 +280,8 @@ findName env _ = "(anonymous)"
 
 -- | Merge CheckStates. Not in wp, see 'mergeFresh' below for explanation.
 mergeStates :: CheckState -> CheckState -> CheckState
-mergeStates cst1 cst2 = CheckState (mergeCons (cstCons cst1) (cstCons cst2))
-                                   (mergeFresh (cstFresh cst1) (cstFresh cst2))
+mergeStates cst1 cst2 = CheckState (mergeCons (_constraints cst1) (_constraints cst2))
+                                   (mergeFresh (_freshInts cst1) (_freshInts cst2))
 
 -- | Merge state (number of next fresh variable in this implementation) of
 -- fresh variable sources.
@@ -305,7 +322,7 @@ mergeTypes t1 t2
 findTypeCleanConstraints :: Env -> Exp -> CM Type
 findTypeCleanConstraints env e = do
   returnType <- findType env e
-  modifyConstraints $ cleanConstraints env returnType
+  constraints %= cleanConstraints env returnType
   return returnType
 
 cleanConstraints :: Env -> Type -> Constraints -> Constraints
@@ -362,19 +379,18 @@ freshName prefix = do
 -- | Get next fresh Int
 freshInt :: CM Int
 freshInt = do
-  cst <- get
-  let ints = cstFresh cst
-  put $ cst { cstFresh = tail ints }
+  ints <- access freshInts
+  freshInts ~= tail ints
   return $ head ints
   
 -- ** Constraints
 
 getConstraints :: CM Constraints
-getConstraints = gets cstCons
+getConstraints = gets _constraints
 
 putConstraints :: Constraints -> CM ()
 putConstraints constraints =
-  modify $ \state -> state { cstCons = constraints } 
+  modify $ \state -> state { _constraints = constraints } 
 
 getsConstraints :: (Constraints -> a) -> CM a
 getsConstraints f = fmap f getConstraints
@@ -382,13 +398,10 @@ getsConstraints f = fmap f getConstraints
 type ModifyConstraints = Constraints -> Constraints
 
 modifyConstraints :: ModifyConstraints -> CM ()
-modifyConstraints f = modify $ \s -> s { cstCons = f (cstCons s) }
+modifyConstraints f = constraints %= f >> return ()
 
-createEmptyConstraint :: TVar -> CM ()
-createEmptyConstraint = modifyConstraints . createEmptyConstraint'
-
-createEmptyConstraint' :: TVar -> ModifyConstraints
-createEmptyConstraint' record = Map.insert record emptyRecType
+createEmptyConstraint :: TVar -> CM Rec
+createEmptyConstraint v = record v ~= emptyRecType
 
 addAttribute :: Var -> Type -> Rec -> Rec
 addAttribute = Map.insert

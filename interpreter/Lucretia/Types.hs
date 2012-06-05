@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell, FlexibleInstances, FlexibleContexts #-}
 
 module Lucretia.Types where
 
@@ -9,6 +9,9 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 
 import Lucretia.Definitions (Var, TVar)
+
+import Data.Lens
+import Data.Lens.Template (makeLens)
 
 -- * Types (/Defition 2.1 (Types)/ in wp)
 
@@ -62,13 +65,15 @@ extendEnv x t env = Map.insert x t env
 -- * Locations to Type Variable Names (Gamma in wp)
 
 data CheckState = CheckState { 
-  cstCons :: Constraints,
-  cstFresh :: [Int]
+  _constraints :: Constraints,
+  _freshInts :: [Int]
 }
   deriving Eq
 
+$(makeLens ''CheckState)
+
 instance Show CheckState where
-  show cst = showConstraints $ cstCons cst
+  show = showConstraints . getL constraints
   
 initState :: CheckState
 initState = CheckState Map.empty [1..]
