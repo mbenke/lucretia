@@ -2,7 +2,7 @@
 -- Tiny4.Interpreter with break handling
 
 module Lucretia.Interpreter where
-import Lucretia.Definitions
+import Lucretia.Definitions (Name, Param)
 import Lucretia.Syntax
 import Lucretia.Exception
 

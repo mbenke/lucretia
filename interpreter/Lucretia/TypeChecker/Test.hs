@@ -7,11 +7,11 @@ import Test.HUnit
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import HUnitUtils(assertEqualShowingDiff)
+import HUnitUtils (assertEqualShowingDiff)
 
-import Lucretia.TypeChecker.Main(checkProg, runCheck)
-import Lucretia.TypeChecker.Syntax
-import Lucretia.TypeChecker.Types
+import Lucretia.TypeChecker.TypeChecker (checkProg, runCheck)
+import Lucretia.Syntax
+import Lucretia.Types
 
 #define VARIABLE_NAME(variable) ("variable", variable)
 
@@ -23,10 +23,19 @@ outputTypeTestsData = [
   (VARIABLE_NAME(eInt), "Right (int,[])"),
   (VARIABLE_NAME(ENew), "Right (X1,[X1 < {}])"),
   (VARIABLE_NAME(eLet), "Right (X1,[X1 < {}])"),
+  -- Record update (update-old)
+  (VARIABLE_NAME(eSetGet), "Right (int,[])"),
+  -- Record access (access)
+  (VARIABLE_NAME(eGet_noVar), "Left \"Unknown variable foo\""),
+  (VARIABLE_NAME(eGet_varNotRec), "Left \"Variable foo: type mismatch: expected record type, but got bool.\""),
+  (VARIABLE_NAME(eGet_wrongField), "Left \"Record {} does not contain field a\""),
+
   (VARIABLE_NAME(eRecordWithOneField), "Right (X1,[X1 < {a:int}])"),
   (VARIABLE_NAME(eRecordWithManyFields), "Right (X1,[X1 < {a:int, b:int, c:int}])"),
   (VARIABLE_NAME(eIfTOr), "Right (X1,[X1 < {a:int v bool}])"),
   (VARIABLE_NAME(eIfTFieldUndefined), "Right (X1,[X1 < {a:int v undefined, b:bool v undefined}])"),
+  (VARIABLE_NAME(eIfHasAttr), "Right (int,[])"),
+  (VARIABLE_NAME(eIfHasAttr_noSuchField), "Left \"Record {a:int v undefined, b:bool v undefined} does not contain field c\""),
   (VARIABLE_NAME(eFunc), "Right (([] bool int -> bool []),[])"),
   (VARIABLE_NAME(eFuncWrongReturnType), "Left \"Type and associated constraints after type-checking method body: bool, [] are not the same as declared in the signature: int, [].\\nExpected type bool but got int.\\n\""),
   (VARIABLE_NAME(eFuncWithConstraints), "Right (([] bool int -> X1 [X1 < {a:int}]),[])"),
@@ -63,10 +72,32 @@ outputTypeTests = map (uncurry mapToATest) outputTypeTestsData
 
 eInt :: Exp
 eInt = EInt 42
+
 eBoolTrue :: Exp
 eBoolTrue = EBoolTrue
+
 eBoolFalse :: Exp
 eBoolFalse = EBoolFalse
+
+eGet_noVar :: Exp
+eGet_noVar =
+  EGet "foo" "a"
+
+eGet_varNotRec :: Exp
+eGet_varNotRec =
+  ELet "foo" EBoolTrue $
+  EGet "foo" "a"
+
+eGet_wrongField :: Exp
+eGet_wrongField =
+  ELet "foo" ENew $
+  EGet "foo" "a"
+
+eSetGet :: Exp
+eSetGet =
+  ELet "foo" ENew $
+  ELet "_" (ESet "foo" "a" $ EInt 42) $
+  EGet "foo" "a"
 
 eLet :: Exp
 eLet = ELet "foo" ENew (EVar "foo")
@@ -103,6 +134,30 @@ eIfTFieldUndefined =
     (ESet "foo" "b" $ EBoolTrue)
   ) $
   EVar "foo"
+
+eIfHasAttr :: Exp
+eIfHasAttr =
+  ELet "foo" ENew $
+  ELet "_"
+  (EIf (EBoolTrue)
+    (ESet "foo" "a" $ EInt 42)
+    (ESet "foo" "b" $ EBoolTrue)
+  ) $
+  EIfHasAttr "foo" "a"
+    (EGet "foo" "a")
+    (EInt 7)
+
+eIfHasAttr_noSuchField :: Exp
+eIfHasAttr_noSuchField =
+  ELet "foo" ENew $
+  ELet "_"
+  (EIf (EBoolTrue)
+    (ESet "foo" "a" $ EInt 42)
+    (ESet "foo" "b" $ EBoolTrue)
+  ) $
+  EIfHasAttr "foo" "c"
+    (EInt 6)
+    (EInt 7)
 
 eFunc :: Exp
 eFunc =
