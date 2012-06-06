@@ -31,8 +31,8 @@ import Data.Function (on)
 
 import Data.List (permutations)
 
-import Lucretia.TypeChecker.Definitions (Name, Param)
-import Lucretia.TypeChecker.Types
+import Lucretia.Definitions (Var, TVar)
+import Lucretia.Types
 
 import LocalState (localState_)
 
@@ -49,7 +49,7 @@ class IsomorphicModuloNames a where
        -> M ()
 type M = ReaderT Environment (StateT Isomorphism (Either String))
 type Environment = (Constraints, Constraints)
-type Isomorphism = Set (Name, Name) -- visited node pairs
+type Isomorphism = Set (TVar, TVar) -- visited node pairs
 
 isomorphic :: M ()
 isomorphic = return ()
@@ -70,7 +70,7 @@ instance IsomorphicModuloNames Type where
   isoM t (TOr s) = isoM (TOr $ Set.singleton t) (TOr s)
   isoM a a' = unless (a == a') $ notIsomorphic $ "Expected type " ++ show a' ++ " but got " ++ show a ++ ".\n"
 
-instance IsomorphicModuloNames Name where
+instance IsomorphicModuloNames TVar where
   isoM n n' = do
     v <- get
     if Set.member (n, n') v
@@ -90,17 +90,17 @@ instance IsomorphicModuloNames Name where
     memberSnd :: (Eq b, Foldable f) => b -> f (a, b) -> Bool
     memberSnd x = any $ \(_, y) -> x == y
 
-    lookupM :: Name -> Constraints -> M RecType
+    lookupM :: TVar -> Constraints -> M Rec
     lookupM n cs =
       case Map.lookup n cs of
 	Just result -> return result
 	Nothing     -> throwError $ "Cannot find type variable named: " ++ n ++ " in constraints: " ++ showConstraints cs ++ ".\n"
 
-instance IsomorphicModuloNames (Map Name Type) where
+instance IsomorphicModuloNames (Map Var Type) where
   isoM = isoM `on` Map.toAscList
   --isoM m m' = Map.toAscList m `isoM` Map.toAscList m'
 
-instance IsomorphicModuloNames [(Name, Type)] where
+instance IsomorphicModuloNames [(Var, Type)] where
   isoM = isoM `on` map snd
 
 instance IsomorphicModuloNames [Type] where
