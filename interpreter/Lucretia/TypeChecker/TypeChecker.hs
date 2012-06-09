@@ -32,13 +32,11 @@ module Lucretia.TypeChecker.TypeChecker where
 
 import Prelude hiding (all)
 
-import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Foldable (all)
 
-import Data.Lens hiding (iso)
+import Data.Lens
 
 import Control.Monad.Error
 import Control.Monad.State
@@ -46,12 +44,12 @@ import Control.Monad.Identity
 
 import DebugUtils (traceShowId, traceShowIdHl)
 
-import OrFail (orFail, orFailE)
+import OrFail (orFail)
 
 import Lucretia.Definitions (Var, Field, TVar)
 import Lucretia.Types
 import Lucretia.Syntax
-import Lucretia.TypeChecker.IsomorphicModuloNames (iso)
+import Lucretia.TypeChecker.MonomorphicModuloNames (weakerOrEqualTo, monoRename)
 
 
 -- * Type checker rules (/3. The type system/ in wp)
@@ -143,49 +141,45 @@ findType env (EVar x) = getType env x
 -- TODO
 
 -- Function definition (fdecl)
-findType env (EFunc (Func xParams tFunc eBody)) = do
-  let TFunc expectedConstraintsBefore tParams expectedU expectedConstraintsAfter = tFunc
-  (length xParams == length tParams) `orFail` "Number of arguments and number of their types do not match"
-  let params = zip xParams tParams
+--
+-- ed- stands for e(xpecte)d (by signature)
+-- al- stands for a(ctua)l (infered from expressions)
+-- -Pre-  stands for  Pre(contidions)
+-- -Post- stands for Post(contidions)
+-- -T  stands for Type
+-- -Cs stands for Constraints
+findType env (EFunc (Func edPreVars expectedFunctionType eBody)) = do
+  let TFunc edPreCs edPreTs edPostT edPostCs = expectedFunctionType
+  (length edPreVars == length edPreTs) `orFail` "Number of arguments and number of their types do not match"
+  let params = zip edPreVars edPreTs
   let extendedEnv = foldl (\envAccumulator (eXi, tXi) -> Map.insert eXi tXi envAccumulator) env params
-  constraintsBeforeBody <- access constraints
 
-  constraints ~= expectedConstraintsBefore
-  u <- findTypeCleanConstraints extendedEnv eBody
-  actualConstraintsAfter <- access constraints
-  iso (expectedU, expectedConstraintsAfter) (u, actualConstraintsAfter) `orFailE` ("Type and associated constraints after type-checking method body: "++show u++", "++showConstraints actualConstraintsAfter++" are not the same as declared in the signature: "++show expectedU++", "++showConstraints expectedConstraintsAfter++".\n")
-  --TODO maybe this:
-  --(actualConstraintsAfter `areAtLeastThatStrongAs` expectedConstraintsAfter) `orFail` ("Returned value should match at least all the constraints that are declared in the signature of function "++funcName++".")
+  stateBeforeBody <- get
+  constraints ~= edPreCs
+  alPostT <- findTypeCleanConstraints extendedEnv eBody
+  alPostCs <- access constraints
+  (edPostT, edPostCs) `weakerOrEqualTo` (alPostT, alPostCs)
+  put stateBeforeBody
 
-  constraints ~= constraintsBeforeBody
-
-  return tFunc --TODO: test eFuncWithUnnecessaryConstraints, tFunc { constraintsAfter = cleanConstraints (Map.fromList [("_", expectedU)] (constraintsAfter tFunc) }
+  return expectedFunctionType
 
 -- Function call (fapp)
-findType env (ECall eFunc eParams) = do
-  let funcName = findName env eFunc
+findType env (ECall funcE alPreE) = do
+  let funcName = findName env funcE
 
-  tFunc <- findTypeCleanConstraints env eFunc
-  let TFunc expectedConstraintsBefore tParams tBody expectedConstraintsAfter = tFunc
-  (length eParams == length tParams) `orFail` ("Function "++funcName++" is applied to "++show (length eParams)++" parameters, but "++show (length tParams)++" parameters should be provided.\n")
+  TFunc edPreCs edPreTs edPostT edPostCs <- findTypeCleanConstraints env funcE
+
+  (length alPreE == length edPreTs) `orFail` ("Function "++funcName++" is applied to "++show (length alPreE)++" parameters, but "++show (length edPreTs)++" parameters should be provided.\n")
   
-  tParamsActual <- mapM (findTypeCleanConstraints env) eParams
-  (tParams == tParamsActual) `orFail` ("Types of parameters should be "++show tParams++" but are "++show tParamsActual++".\n")
+  alPreTs <- mapM (findTypeCleanConstraints env) alPreE
+  alPreCs <- access constraints
+  mono <- (edPreTs, edPreCs) `weakerOrEqualTo` (alPreTs, alPreCs)
 
-  actualConstraintsBeforeBody <- access constraints
-  (expectedConstraintsBefore `constraintsAreWeakerOrEqualTo` actualConstraintsBeforeBody) `orFail` ("Constraints before calling function "++funcName++": "++showConstraints actualConstraintsBeforeBody++" are not that strong as pre-constraints in the function definition: "++showConstraints expectedConstraintsBefore++".\n")
+  constraints ~= alPreCs `merge` monoRename mono edPostCs
 
-  constraints ~= actualConstraintsBeforeBody `merge` expectedConstraintsAfter
-
-  return tBody
+  return edPostT
 
   where
-
-  constraintsAreWeakerOrEqualTo :: Constraints -> Constraints -> Bool
-  constraintsAreWeakerOrEqualTo = Map.isSubmapOfBy recordIsSmallerOrEqualTo
-  
-  recordIsSmallerOrEqualTo :: Rec -> Rec -> Bool
-  recordIsSmallerOrEqualTo = Map.isSubmapOf
 
   merge :: Constraints -> Constraints -> Constraints
   merge = Map.unionWith seq
@@ -298,15 +292,15 @@ findTypeCleanConstraints env e = do
   return returnType
 
 cleanConstraints :: Env -> Type -> Constraints -> Constraints
-cleanConstraints env returnType inputCs = foldl addConstraintsForName Map.empty tVarsNeededInEnv
+cleanConstraints env returnType inputCs = foldl addCsForName Map.empty tVarsNeededInEnv
   where
   tVarsNeededInEnv :: [TVar]
   tVarsNeededInEnv = filterTVars $ returnType : Map.elems env
 
-  addConstraintsForName :: Constraints -> TVar -> Constraints
-  addConstraintsForName neededCsAcc neededTVarName
+  addCsForName :: Constraints -> TVar -> Constraints
+  addCsForName neededCsAcc neededTVarName
     | neededTVarName `Map.member` neededCsAcc = neededCsAcc
-    | otherwise = foldl addConstraintsForName neededCsAccIncreased tVarsNeededInNeededTVar
+    | otherwise = foldl addCsForName neededCsAccIncreased tVarsNeededInNeededTVar
     where
     neededTVarType = inputCs Map.! neededTVarName 
     tVarsNeededInNeededTVar = filterTVars $ Map.elems neededTVarType
@@ -339,6 +333,7 @@ isRight (Left  _) = False
 -- ** Fresh variables (… in wp)
 
 -- | Get fresh 'TVar'
+freshTVar :: CM String
 freshTVar = freshName "X"
 
 -- | Get fresh variable name with given prefix

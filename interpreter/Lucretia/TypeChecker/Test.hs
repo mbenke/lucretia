@@ -9,7 +9,8 @@ import qualified Data.Set as Set
 
 import HUnitUtils (assertEqualShowingDiff)
 
-import Lucretia.TypeChecker.TypeChecker (checkProg, runCheck)
+import Lucretia.Definitions
+import Lucretia.TypeChecker.TypeChecker (runCheck)
 import Lucretia.Syntax
 import Lucretia.Types
 
@@ -18,7 +19,8 @@ import Lucretia.Types
 tests :: [Test]
 tests = outputTypeTests
 
-outputTypeTestsData :: [((String, Exp), String)]
+type OutputTestDatum = ((String, Exp), String)
+outputTypeTestsData :: [OutputTestDatum]
 outputTypeTestsData = [
   (VARIABLE_NAME(eInt), "Right (int,[])"),
   (VARIABLE_NAME(ENew), "Right (X1,[X1 < {}])"),
@@ -36,28 +38,31 @@ outputTypeTestsData = [
   (VARIABLE_NAME(eIfTFieldUndefined), "Right (X1,[X1 < {a:int v undefined, b:bool v undefined}])"),
   (VARIABLE_NAME(eIfHasAttr), "Right (int,[])"),
   (VARIABLE_NAME(eIfHasAttr_noSuchField), "Left \"Record {a:int v undefined, b:bool v undefined} does not contain field c\""),
-  (VARIABLE_NAME(eFunc), "Right (([] bool int -> bool []),[])"),
-  (VARIABLE_NAME(eFuncWrongReturnType), "Left \"Type and associated constraints after type-checking method body: bool, [] are not the same as declared in the signature: int, [].\\nExpected type bool but got int.\\n\""),
-  (VARIABLE_NAME(eFuncWithConstraints), "Right (([] bool int -> X1 [X1 < {a:int}]),[])"),
+  (VARIABLE_NAME(eFunc), "Right ([] bool int -> bool [],[])"),
+  (VARIABLE_NAME(eFuncWrongReturnType), "Left \"Expected condition (type: int; with constraints: []) should be weaker or equal to actual condition (type: bool; with constraints: []). They are not because: type bool does not equal int.\""),
+  (VARIABLE_NAME(eFuncWithConstraints), "Right ([] bool int -> X1 [X1 < {a:int}],[])"),
   (VARIABLE_NAME(eFuncWrongNumberOfArguments), "Left \"Number of arguments and number of their types do not match\""),
   --maybe this should be ok:
-  --(eFuncReturningRecordWithMoreFieldsThanRequiredByConstraintsInFunctionSignature, "Right (([] bool int -> X1 [X1 < {a:int}]),[])"),
-  (VARIABLE_NAME(eFuncDefiningRecordInsideButNotReturningIt), "Right (([] bool int -> bool []),[])"),
+  --(eFuncReturningRecordWithMoreFieldsThanRequiredByConstraintsInFunctionSignature, "Right ([] bool int -> X1 [X1 < {a:int}],[])"),
+  (VARIABLE_NAME(eFuncDefiningRecordInsideButNotReturningIt), "Right ([] bool int -> bool [],[])"),
   (VARIABLE_NAME(eLetDefiningRecordInsideButNotReturningIt), "Right (bool,[])"),
-  (VARIABLE_NAME(eFuncDefiningNestedRecordInsideAndReturningIt), "Right (([] bool int -> X3 [X1 < {a:int}, X3 < {c:X1}]),[])"),
+  (VARIABLE_NAME(eFuncDefiningNestedRecordInsideAndReturningIt), "Right ([] bool int -> X3 [X1 < {a:int}, X3 < {c:X1}],[])"),
   (VARIABLE_NAME(eLetDefiningNestedRecordInsideAndReturningIt), "Right (X3,[X1 < {a:int}, X3 < {c:X1}])"),
-  (VARIABLE_NAME(eFuncDefiningNestedRecordInsideAndReturningItHavingDifferentlyNamedConstraintVariables), "Right (([] bool int -> C [A < {a:int}, C < {c:A}]),[])"),
-  (VARIABLE_NAME(eFuncWithUnnecessaryConstraints), "Right (([] bool int -> X1 [X1 < {a:int}]),[])"),
-  (VARIABLE_NAME(eFuncDefiningNestedRecordInsideAndHavingMismatchingConstraintSignature1), "Left \"Type and associated constraints after type-checking method body: X3, [X1 < {a:int}, X3 < {c:X1}] are not the same as declared in the signature: C, [C < {c:int}].\\nExpected type X1 but got int.\\n\""),
+  (VARIABLE_NAME(eFuncTOr), "Right ([]  -> X [X < {a:int v bool}],[])"),
+  (VARIABLE_NAME(eFuncTOr_withGarbageConstraint), "Right ([]  -> X [X < {a:int}],[])"),
+  (VARIABLE_NAME(eFuncTOr_postCondition_expectedWeakerThanActual), "Right ([]  -> X [X < {a:int v bool}],[])"),
+  (VARIABLE_NAME(eFuncTOr_postCondition_expectedWeakerThanActual_moreRecords), "Right ([]  -> X [X < {a:int v bool}],[])"),
+  (VARIABLE_NAME(eFuncTOr_postCondition_expectedStrongerThanActual), "Left \"Expected condition (type: X; with constraints: [X < {a:int}]) should be weaker or equal to actual condition (type: X1; with constraints: [X1 < {a:int v bool}]). They are not because: type mismatch:\\n  [int]\\n  [int,bool]\""),
+  (VARIABLE_NAME(eFuncDefiningNestedRecordInsideAndReturningItHavingDifferentlyNamedConstraintVariables), "Right ([] bool int -> C [A < {a:int}, C < {c:A}],[])"),
+  (VARIABLE_NAME(eFuncWithUnnecessaryConstraints), "Right ([] bool int -> X1 [X1 < {a:int}, X2 < {b:bool}],[])"),
+  (VARIABLE_NAME(eFuncDefiningNestedRecordInsideAndHavingMismatchingConstraintSignature1), "Left \"Expected condition (type: C; with constraints: [C < {c:int}]) should be weaker or equal to actual condition (type: X3; with constraints: [X1 < {a:int}, X3 < {c:X1}]). They are not because: type X1 does not equal int.\""),
 
-  --TODO test catching error
-  (VARIABLE_NAME(eFuncWithDanglingTypeVariableInSignature), "Left \"Type and associated constraints after type-checking method body: X3, [X1 < {a:int}, X3 < {c:X1}] are not the same as declared in the signature: C, [A < {a:int}].\\nCannot find type variable named: C in constraints: [A < {a:int}].\\n\""),
+  (VARIABLE_NAME(eFuncWithDanglingTypeVariableInSignature), "Left \"Expected condition (type: C; with constraints: [A < {a:int}]) should be weaker or equal to actual condition (type: X3; with constraints: [X1 < {a:int}, X3 < {c:X1}]). They are not because: cannot find type variable named: C in constraints: [A < {a:int}].\""),
   (VARIABLE_NAME(eCall), "Right (X1,[X1 < {a:int}])"),
+  (VARIABLE_NAME(eCall_eFuncWithWeakConstraints), "Right (X1,[X1 < {a:int}])"),
   (VARIABLE_NAME(eLetReturningCyclicNestedRecord), "Right (X3,[X1 < {a:X3}, X3 < {c:X1}])"),
-  (VARIABLE_NAME(eFuncReturningCyclicNestedRecord), "Right (([] bool int -> X3 [X1 < {a:X3}, X3 < {c:X1}]),[])"),
-  (VARIABLE_NAME(eCallLet), "Right (X1,[X1 < {a:int}])"),
-  (VARIABLE_NAME(eFuncTOr), "Right (([]  -> X [X < {a:int v bool}]),[])"),
-  (VARIABLE_NAME(eFuncTOrWrongConstraints), "Left \"Type and associated constraints after type-checking method body: X1, [X1 < {a:int v bool}] are not the same as declared in the signature: X, [X < {a:int}].\\nType mismatch:\\n  [int]\\n  [int,bool]\"")
+  (VARIABLE_NAME(eFuncReturningCyclicNestedRecord), "Right ([] bool int -> X3 [X1 < {a:X3}, X3 < {c:X1}],[])"),
+  (VARIABLE_NAME(eCallLet), "Right (X1,[X1 < {a:int}])")
   ]
 
 outputTypeTests :: [Test]
@@ -183,6 +188,15 @@ eFuncWithConstraints =
     eRecordWithOneField
   )
 
+eCall_eFuncWithWeakConstraints :: Exp
+eCall_eFuncWithWeakConstraints =
+  ELet "f" (EFunc (Func 
+    ["x1"]
+    (TFunc (Map.fromList []) [TOr $ Set.fromList [TBool, TInt]] (TVar "X1") (Map.fromList [("X1", oneFieldTRec "a" TInt)]))
+    eRecordWithOneField
+  )) $
+  ECall (EVar "f") [EBoolTrue]
+
 eFuncReturningRecordWithMoreFieldsThanRequiredByConstraintsInFunctionSignature :: Exp
 eFuncReturningRecordWithMoreFieldsThanRequiredByConstraintsInFunctionSignature =
   EFunc (Func 
@@ -289,6 +303,7 @@ eCallLet =
   ELet "fun" eFuncWithConstraints $
     ECall (EVar "fun") [EBoolTrue, (EInt 42)]
 
+emptyConstraints :: Map.Map TVar Rec
 emptyConstraints = Map.fromList []
 
 eFuncTOr :: Exp
@@ -300,8 +315,39 @@ eFuncTOr =
     ) $
     eIfTOr
 
-eFuncTOrWrongConstraints :: Exp
-eFuncTOrWrongConstraints =
+eFuncTOr_withGarbageConstraint :: Exp
+eFuncTOr_withGarbageConstraint =
+  EFunc $ Func
+    []
+    (TFunc emptyConstraints [] (TVar "X")
+      (Map.fromList [("X", oneFieldTRec "a" TInt)])
+    ) $
+    ELet "x" ENew $
+    ELet "y" ENew $
+    ELet "_" (ESet "x" "a" $ EInt 7) $
+    ELet "_" (ESet "y" "b" $ EInt 8) $
+      EVar "x"
+
+eFuncTOr_postCondition_expectedWeakerThanActual :: Exp
+eFuncTOr_postCondition_expectedWeakerThanActual =
+  EFunc $ Func
+    []
+    (TFunc emptyConstraints [] (TVar "X")
+      (Map.fromList [("X", oneFieldTRec "a" (TOr $ Set.fromList [TBool, TInt]))])
+    ) $
+    eRecordWithOneField
+
+eFuncTOr_postCondition_expectedWeakerThanActual_moreRecords :: Exp
+eFuncTOr_postCondition_expectedWeakerThanActual_moreRecords =
+  EFunc $ Func
+    []
+    (TFunc emptyConstraints [] (TVar "X")
+      (Map.fromList [("X", oneFieldTRec "a" (TOr $ Set.fromList [TBool, TInt]))])
+    ) $
+    eRecordWithManyFields
+
+eFuncTOr_postCondition_expectedStrongerThanActual :: Exp
+eFuncTOr_postCondition_expectedStrongerThanActual =
   EFunc $ Func
     []
     (TFunc emptyConstraints [] (TVar "X")

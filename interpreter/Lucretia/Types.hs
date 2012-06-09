@@ -109,6 +109,6 @@ instance Show Type where
   show (TRec r) = showRec r
   show (TOr ts) = intercalate " v " $ map show $ Set.toList ts
   show (TFieldUndefined) = "undefined"
-  show (TFunc constraintsBefore paramTypes bodyType constraintsAfter) = "(" ++ showConstraints constraintsBefore ++ " " ++ intercalate " " (map show paramTypes) ++ " -> " ++ show bodyType ++ " " ++ showConstraints constraintsAfter ++ ")"
+  show (TFunc constraintsBefore paramTypes bodyType constraintsAfter) = showConstraints constraintsBefore ++ " " ++ intercalate " " (map show paramTypes) ++ " -> " ++ show bodyType ++ " " ++ showConstraints constraintsAfter
 
 
