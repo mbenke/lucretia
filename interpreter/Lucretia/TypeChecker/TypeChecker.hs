@@ -89,7 +89,7 @@ findType env i@(EIf eIf eThen eElse) = do
   tElse <- findTypeCleanConstraints env eElse
   stateAfterElse <- get
 
-  (tThen == tElse) `orFail` ("Type after then: "++show tThen++" does not match type after else: "++show tElse++". In "++show i)
+  (tThen `eqOrAny` tElse) `orFail` ("Type after then: "++show tThen++" does not match type after else: "++show tElse++". In "++show i)
 
   put $ mergeStates stateAfterThen stateAfterElse
   return tThen
@@ -107,7 +107,7 @@ findType env i@(EIfHasAttr x a eThen eElse) = do
   tElse <- findTypeCleanConstraints env eElse
   stateAfterElse <- get
 
-  (tThen == tElse) `orFail` ("Type after then: "++show tThen++" does not match type after else: "++show tElse++". In "++show i)
+  (tThen `eqOrAny` tElse) `orFail` ("Type after then: "++show tThen++" does not match type after else: "++show tElse++". In "++show i)
 
   put $ mergeStates stateAfterThen stateAfterElse
   return tThen
@@ -164,30 +164,46 @@ findType env (EFunc (Func edPreVars expectedFunctionType eBody)) = do
   return expectedFunctionType
 
 -- Function call (fapp)
-findType env (ECall funcE alPreE) = do
+findType env (ECall funcE alPreEs) = do
   let funcName = findName env funcE
 
   TFunc edPreCs edPreTs edPostT edPostCs <- findTypeCleanConstraints env funcE
 
-  (length alPreE == length edPreTs) `orFail` ("Function "++funcName++" is applied to "++show (length alPreE)++" parameters, but "++show (length edPreTs)++" parameters should be provided.\n")
+  (length alPreEs == length edPreTs) `orFail` ("Function "++funcName++" is applied to "++show (length alPreEs)++" parameters, but "++show (length edPreTs)++" parameters should be provided.\n")
   
-  alPreTs <- mapM (findTypeCleanConstraints env) alPreE
+  alPreTs <- mapM (findTypeCleanConstraints env) alPreEs
   alPreCs <- access constraints
   mono <- (edPreTs, edPreCs) `weakerOrEqualTo` (alPreTs, alPreCs)
 
-  constraints ~= alPreCs `merge` monoRename mono edPostCs
-
+  constraints ~= alPreCs `mergeUpdate` monoRename mono edPostCs
   return edPostT
 
-  where
-
-  merge :: Constraints -> Constraints -> Constraints
-  merge = Map.unionWith seq
-
 -- Control flow with break instructions (label)
--- TODO
+findType env (ELabel name expectedFunctionType eBody) = do
+  let TFunc _ _ edPostT edPostCs = expectedFunctionType
+  let extendedEnv = Map.insert name expectedFunctionType env
+
+  alPreCs <- access constraints
+  alPostT <- findTypeCleanConstraints extendedEnv eBody
+  alPostCs <- access constraints
+  mono <- (edPostT, edPostCs) `weakerOrEqualTo` (alPostT, alPostCs)
+
+  constraints ~= alPreCs `mergeUpdate` monoRename mono edPostCs
+  return edPostT
+
 -- Control flow with break instructions (break)
--- TODO
+findType env (EBreak name eBody) = do
+  Map.member name env `orFail` ("Label "++name++" was not declared.")
+  let TFunc _ _ edPostT edPostCs = env Map.! name
+  let extendedEnv = env
+
+  alPreCs <- access constraints
+  alPostT <- findTypeCleanConstraints extendedEnv eBody
+  alPostCs <- access constraints
+  mono <- (edPostT, edPostCs) `weakerOrEqualTo` (alPostT, alPostCs)
+
+  constraints ~= emptyConstraints
+  return TAny
 
 -- Let-expression (let)
 findType env (ELet x e1 e0) = do  
@@ -207,6 +223,11 @@ findType env ENew = do
 findType env (EInt _) = return TInt
 findType env EBoolTrue = return TBool
 findType env EBoolFalse = return TBool
+
+-- ** Type information update (Definition 3.4 in wp)
+
+mergeUpdate :: Constraints -> Constraints -> Constraints
+mergeUpdate = Map.unionWith seq
 
 -- ** Helper functions
 
@@ -285,7 +306,7 @@ mergeTypes t1 t2
 
 -- * Garbage collection of unnecessary Constraints (not in wp?)
 
-findTypeCleanConstraints :: Env -> Exp -> CM Type
+
 findTypeCleanConstraints env e = do
   returnType <- findType env e
   constraints %= cleanConstraints env returnType

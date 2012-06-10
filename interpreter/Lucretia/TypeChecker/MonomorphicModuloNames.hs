@@ -37,7 +37,11 @@ import Lucretia.Types
 
 import MonadUtils (localState_, anyM)
 
-type Monomorphism = Set (TVar, TVar) -- visited node pairs
+-- | Monomorphism from expected (as declared in signature) to
+-- actual Type Variables.
+--
+-- Also serves as a list of visited node pairs.
+type Monomorphism = Set (TVar, TVar)
 
 -- | Rename using monomorphism
 monoRename :: Monomorphism -> Constraints -> Constraints
@@ -93,10 +97,9 @@ instance MonomorphicModuloNames Type where
     w' ts ts' = anyM [localState_ $ w ps ps' | ps <- subsequences ts, ps' <- permutations ts'] err
       where
       err = notMonomorphic $ "type mismatch:\n  " ++ show ts ++ "\n  " ++ show ts'
-    --w' ts ts' = w'' ts ts' (permutations . subsequences $ ts')
   w (TOr s) t = w (TOr s) (TOr $ Set.singleton t)
   w t (TOr s) = w (TOr $ Set.singleton t) (TOr s)
-  w a a' = unless (a == a') $ notMonomorphic $ "type " ++ show a' ++ " does not equal " ++ show a ++ "."
+  w a a' = unless (a `eqOrAny` a') $ notMonomorphic $ "type " ++ show a' ++ " does not equal " ++ show a ++ "."
 
 instance MonomorphicModuloNames TVar where
   w n n' = do

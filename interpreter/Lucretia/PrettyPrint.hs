@@ -40,10 +40,11 @@ instance Pretty Exp where
 
   pretty (EGet x a) = text $ x++"."++a
   pretty (ESet x a e) = (text $ x++"."++a++" =") <+> pretty e
-  pretty (ELabel l e) =
+  pretty (ELabel l t e) =
     vcat
-    [ text $ l++":"
+    [ text l <+> char '.' <+> pretty t <+> char '{'
     , indent . pretty $ e
+    , char '}'
     ]
   pretty (EBreak l e) =
     vcat
@@ -69,8 +70,9 @@ op e o e' = pretty e <+> text o <+> pretty e'
 instance Pretty Func where
   pretty (Func xs t eBody) =
     vcat
-    [ text "func" <+> char '(' <> pretty xs <> char ')' <+> text "::" <+> pretty t
+    [ text "func" <+> char '(' <> pretty xs <> char ')' <+> char '.' <+> pretty t <+> char '{'
     , indent . pretty $ eBody
+    , char '}'
     ]
 
 instance Pretty [String] where

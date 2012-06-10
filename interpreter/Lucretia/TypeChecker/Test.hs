@@ -62,7 +62,11 @@ outputTypeTestsData = [
   (VARIABLE_NAME(eCall_eFuncWithWeakConstraints), "Right (X1,[X1 < {a:int}])"),
   (VARIABLE_NAME(eLetReturningCyclicNestedRecord), "Right (X3,[X1 < {a:X3}, X3 < {c:X1}])"),
   (VARIABLE_NAME(eFuncReturningCyclicNestedRecord), "Right ([] bool int -> X3 [X1 < {a:X3}, X3 < {c:X1}],[])"),
-  (VARIABLE_NAME(eCallLet), "Right (X1,[X1 < {a:int}])")
+  (VARIABLE_NAME(eCallLet), "Right (X1,[X1 < {a:int}])"),
+  (VARIABLE_NAME(eBreak), "Left \"Label L1 was not declared.\""),
+  (VARIABLE_NAME(eLabelBreak), "Right (bool,[])"),
+  (VARIABLE_NAME(eLabelBreak_preservingConstraintsDespiteApplyingSignature), "Right (X,[X < {a:int v bool}])")
+  --"Shows why $\\Psi_1$ is needed in $\\Psi_2 \\vdc \\mathfrak{f}(\\Psi'_2)$"
   ]
 
 outputTypeTests :: [Test]
@@ -303,9 +307,6 @@ eCallLet =
   ELet "fun" eFuncWithConstraints $
     ECall (EVar "fun") [EBoolTrue, (EInt 42)]
 
-emptyConstraints :: Map.Map TVar Rec
-emptyConstraints = Map.fromList []
-
 eFuncTOr :: Exp
 eFuncTOr =
   EFunc $ Func
@@ -354,3 +355,37 @@ eFuncTOr_postCondition_expectedStrongerThanActual =
       (Map.fromList [("X", oneFieldTRec "a" (TOr $ Set.fromList [TInt]))])
     ) $
     eIfTOr
+
+eBreak :: Exp
+eBreak =
+  EBreak "L1" $
+    EBoolTrue
+
+eLabelBreak :: Exp
+eLabelBreak =
+  ELabel "L1"
+    (TFunc emptyConstraints [] TBool emptyConstraints) $
+    EBreak "L1" $
+      EBoolTrue
+
+eLabelBreak_preservingConstraintsDespiteApplyingSignature :: Exp
+eLabelBreak_preservingConstraintsDespiteApplyingSignature =
+  ELet "x" ENew $
+  ELet "_" (ESet "x" "a" $ EInt 7) $
+  ELabel "L1"
+    (TFunc emptyConstraints [] (TVar "X")
+      (Map.fromList [("X", oneFieldTRec "a" (TOr $ Set.fromList [TBool, TInt]))])
+    ) $
+    ELet "y" ENew $
+    ELet "_" (ESet "y" "b" $ EInt 8) $
+    EIf EBoolTrue
+      (EBreak "L1" $
+        ELet "_" (ESet "y" "b" $ EBoolTrue) $
+	  EVar "y"
+      )
+      (EVar "y")
+
+
+
+    
+
