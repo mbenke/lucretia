@@ -27,7 +27,13 @@ data Type
   | TOr (Set Type) -- ^ @t_b,1 v t_b,2@ in wp
   | TFieldUndefined -- ^ @_|_@ in wp
   | TFunc Constraints [Type] Type Constraints -- ^ @[t1, …, tn; Psi_1] => [tn+1; \Psi_2]@ in wp
+  | TAny
   deriving (Eq, Ord)
+
+eqOrAny :: Type -> Type -> Bool
+eqOrAny TAny _ = True
+eqOrAny _ TAny = True
+eqOrAny t t' = t == t'
 
 -- * Record Type (@t_r = {l : t} | {}@ in wp)
 
@@ -51,6 +57,9 @@ emptyRecType = Map.empty
 --
 -- List of pairs @X <# t_r@ in wp.
 type Constraints = Map TVar Rec
+
+emptyConstraints :: Map.Map TVar Rec
+emptyConstraints = Map.fromList []
 
 -- * Environment: Variable Names to Types (Sigma in wp)
 
@@ -109,6 +118,7 @@ instance Show Type where
   show (TRec r) = showRec r
   show (TOr ts) = intercalate " v " $ map show $ Set.toList ts
   show (TFieldUndefined) = "undefined"
-  show (TFunc constraintsBefore paramTypes bodyType constraintsAfter) = "(" ++ showConstraints constraintsBefore ++ " " ++ intercalate " " (map show paramTypes) ++ " -> " ++ show bodyType ++ " " ++ showConstraints constraintsAfter ++ ")"
+  show (TFunc constraintsBefore paramTypes bodyType constraintsAfter) = showConstraints constraintsBefore ++ " " ++ intercalate " " (map show paramTypes) ++ " -> " ++ show bodyType ++ " " ++ showConstraints constraintsAfter
+  show TAny = "any-type"
 
 

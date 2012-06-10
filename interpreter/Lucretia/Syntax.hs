@@ -22,7 +22,7 @@ data Exp
 
     | EGet Var Field
     | ESet Var Field Exp
-    | ELabel Label Exp
+    | ELabel Label Type Exp
     | EBreak Label Exp
     | EFunc Func
     | ECall Exp [Exp]
