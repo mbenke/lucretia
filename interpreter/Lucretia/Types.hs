@@ -22,7 +22,7 @@ import MapLenses (mapInsertLens)
 data Type
   = TInt -- ^ @c@ in wp
   | TBool -- ^ @c@ in wp
-  | TString -- ^ @c@ in wp
+  | TStr -- ^ @c@ in wp
   | TNone -- ^ @c@ in wp
   | TVar TVar -- ^ @X@ in wp
   | TRec Rec -- ^ @t_r@ in wp
@@ -116,7 +116,7 @@ showRec r = concat ["{",showFields fields,"}"] where
 instance Show Type where
   show TInt = "int"
   show TBool = "bool"
-  show TString = "string"
+  show TStr  = "string"  
   show TNone = "NoneType"
   show (TVar v) = v
   show (TRec r) = showRec r

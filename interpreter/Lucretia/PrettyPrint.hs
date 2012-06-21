@@ -14,7 +14,7 @@ instance Pretty Exp where
   pretty (EInt n) = integer n
   pretty (EBoolTrue) = text "True"
   pretty (EBoolFalse) = text "False"
-  pretty (EString s) = text . show $ s
+  pretty (EStr s) = text . show $ s
   pretty (ENone) = text "None"
 
   pretty (EVar x) = text x

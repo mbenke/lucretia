@@ -11,9 +11,8 @@ data Exp
     = EInt Integer
     | EBoolTrue
     | EBoolFalse
-    | EString String
+    | EStr String
     | ENone
-
     | EVar Var
     | ELet Var Exp Exp
     | ELets Defs Exp
