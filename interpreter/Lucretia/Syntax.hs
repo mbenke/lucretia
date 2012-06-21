@@ -11,6 +11,7 @@ data Exp
     = EInt Integer
     | EBoolTrue
     | EBoolFalse
+    | EString String
     | ENone
 
     | EVar Var

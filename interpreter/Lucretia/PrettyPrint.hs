@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
 
-module Lucretia.PrettyPrint where
+module Lucretia.PrettyPrint (pretty) where
 
 import Text.PrettyPrint
 import PrettyPrintUtils
@@ -14,6 +14,7 @@ instance Pretty Exp where
   pretty (EInt n) = integer n
   pretty (EBoolTrue) = text "True"
   pretty (EBoolFalse) = text "False"
+  pretty (EString s) = text . show $ s
   pretty (ENone) = text "None"
 
   pretty (EVar x) = text x

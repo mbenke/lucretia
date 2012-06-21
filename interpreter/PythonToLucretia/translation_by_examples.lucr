@@ -1,0 +1,91 @@
+######################################################################
+# pyToLu compiler helper variables:
+#
+
+temp = new # temporary variables
+
+######################################################################
+# Main module (compiled from empty python source file):
+#
+
+main = new
+main.__builtins__ = new # TODO fill with python built-in functions, classes, etc
+main.__doc__ = "whatever" # or better, a string object
+main.__file__ = "whatever" # we do not care about values, we just want String type
+main.__name__ = "whatever"
+main.__package__ = new # TODO what object it should be
+
+######################################################################
+# import __main__
+#
+
+# a special case of compiling 'import' statement
+main.__main__ = main
+
+######################################################################
+# class A:
+#   a = 42
+#
+main.A = new
+main.A.__bases__ = 
+main.A.__doc__ = "whatever" # or better, a string object
+main.A.__name__ = "A"
+
+main.A.a = 42
+
+
+######################################################################
+# (5, 7)
+#
+
+temp.t1 = new
+temp.t1.__class__ = main.__builtins__.tuple
+
+temp.t1.__0__ = 5
+temp.t1.__1__ = 7
+
+######################################################################
+# def f():
+#   def g():
+#     a
+#
+
+# Taken from: http://docs.python.org/tutorial/classes.html#python-scopes-and-namespaces
+# Although scopes are determined statically, they are used dynamically. At any time during execution, there are at least three nested scopes whose namespaces are directly accessible:
+#
+ifhasattr (main.f.g.a) {
+  # the innermost scope, which is searched first, contains the local names
+  main.f.g.a
+} else {
+  ifhasattr (main.f.a) {
+    # the scopes of any enclosing functions, which are searched starting with the nearest enclosing scope, contains non-local, but also non-global names
+    main.f.a
+  } else {
+    ifhasattr (main.a) {
+      # the next-to-last scope contains the current module’s global names
+      main.a
+    } else {
+      # the outermost scope (searched last) is the namespace containing built-in names
+      main.__builtins__.a
+    }
+  }
+}
+ 
+######################################################################
+# x = A()
+#
+
+main.x = new
+main.x.__class__ = main.A
+
+######################################################################
+# t1 = x.a
+#
+
+# TODO going up in the class hierarchy. py2lu needs to have information about class hierarchy to generate such code.
+if_hasattr (main.x, a) {
+  temp.t1 = main.x.a
+} else {
+  temp.t1 = main.A.a
+}
+

@@ -248,6 +248,7 @@ findType env ENew = do
 findType env (EInt _) = return TInt
 findType env EBoolTrue = return TBool
 findType env EBoolFalse = return TBool
+findType env (EString _) = return TString
 findType env ENone = return TNone
 findType env (EAdd e e') = do
   t  <- findType env e
