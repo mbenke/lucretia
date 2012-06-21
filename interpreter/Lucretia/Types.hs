@@ -22,6 +22,7 @@ import MapLenses (mapInsertLens)
 data Type
   = TInt -- ^ @c@ in wp
   | TBool -- ^ @c@ in wp
+  | TNone -- ^ @c@ in wp
   | TVar TVar -- ^ @X@ in wp
   | TRec Rec -- ^ @t_r@ in wp
   | TOr (Set Type) -- ^ @t_b,1 v t_b,2@ in wp
@@ -114,11 +115,11 @@ showRec r = concat ["{",showFields fields,"}"] where
 instance Show Type where
   show TInt = "int"
   show TBool = "bool"
+  show TNone = "NoneType"
   show (TVar v) = v
   show (TRec r) = showRec r
   show (TOr ts) = intercalate " v " $ map show $ Set.toList ts
   show (TFieldUndefined) = "undefined"
   show (TFunc constraintsBefore paramTypes bodyType constraintsAfter) = showConstraints constraintsBefore ++ " " ++ intercalate " " (map show paramTypes) ++ " -> " ++ show bodyType ++ " " ++ showConstraints constraintsAfter
   show TAny = "any-type"
-
 

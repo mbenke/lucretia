@@ -70,7 +70,9 @@ outputTypeTestsData = [
   (VARIABLE_NAME(eGetN), "Right (int,[])"),
   (VARIABLE_NAME(eGetN_nested), "Right (int,[])"),
   (VARIABLE_NAME(eSetN_nested), "Right (int,[])"),
-  (VARIABLE_NAME(eGetN_wrong), "Left \"Unknown variable x3.\"")
+  (VARIABLE_NAME(eGetN_wrong), "Left \"Unknown variable x3.\""),
+  (VARIABLE_NAME(eAdd), "Right (int,[])"),
+  (VARIABLE_NAME(eAdd_wrong), "Left \"TypeError: unsupported operand type(s) for +: int and NoneType\"")
   ]
 
 outputTypeTests :: [Test]
@@ -415,4 +417,12 @@ eGetN_wrong =
   ELet "x1" ENew $
   ELet "_" (ESetN ["x1", "x2"] ENew) $
   EGetN ["x1", "x2", "x3"]
+
+eAdd :: Exp
+eAdd =
+  EAdd (EInt 35) (EInt 7)
+
+eAdd_wrong :: Exp
+eAdd_wrong =
+  EAdd (EInt 35) ENone
 

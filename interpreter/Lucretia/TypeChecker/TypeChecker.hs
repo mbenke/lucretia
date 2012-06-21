@@ -248,6 +248,14 @@ findType env ENew = do
 findType env (EInt _) = return TInt
 findType env EBoolTrue = return TBool
 findType env EBoolFalse = return TBool
+findType env ENone = return TNone
+findType env (EAdd e e') = do
+  t  <- findType env e
+  t' <- findType env e'
+  (t /= TNone && t' /= TNone)
+    `orFail` ("TypeError: unsupported operand type(s) for +: "
+             ++show t++" and "++show t')
+  return TInt
 
 -- ** Type information update (Definition 3.4 in wp)
 
