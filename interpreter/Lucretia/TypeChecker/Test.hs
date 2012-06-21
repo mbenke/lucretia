@@ -28,8 +28,8 @@ outputTypeTestsData = [
   -- Record update (update-old)
   (VARIABLE_NAME(eSetGet), "Right (int,[])"),
   -- Record access (access)
-  (VARIABLE_NAME(eGet_noVar), "Left \"Unknown variable foo\""),
-  (VARIABLE_NAME(eGet_varNotRec), "Left \"Variable foo: type mismatch: expected record type, but got bool.\""),
+  (VARIABLE_NAME(eGet_noVar), "Left \"Unknown variable foo.\""),
+  (VARIABLE_NAME(eGet_varNotRec), "Left \"Variable type mismatch: expected record type, but got bool.\""),
   (VARIABLE_NAME(eGet_wrongField), "Left \"Record {} does not contain field a\""),
 
   (VARIABLE_NAME(eRecordWithOneField), "Right (X1,[X1 < {a:int}])"),
@@ -65,8 +65,12 @@ outputTypeTestsData = [
   (VARIABLE_NAME(eCallLet), "Right (X1,[X1 < {a:int}])"),
   (VARIABLE_NAME(eBreak), "Left \"Label L1 was not declared.\""),
   (VARIABLE_NAME(eLabelBreak), "Right (bool,[])"),
-  (VARIABLE_NAME(eLabelBreak_preservingConstraintsDespiteApplyingSignature), "Right (X,[X < {a:int v bool}])")
+  (VARIABLE_NAME(eLabelBreak_preservingConstraintsDespiteApplyingSignature), "Right (X,[X < {a:int v bool}])"),
   --"Shows why $\\Psi_1$ is needed in $\\Psi_2 \\vdc \\mathfrak{f}(\\Psi'_2)$"
+  (VARIABLE_NAME(eGetN), "Right (int,[])"),
+  (VARIABLE_NAME(eGetN_nested), "Right (int,[])"),
+  (VARIABLE_NAME(eSetN_nested), "Right (int,[])"),
+  (VARIABLE_NAME(eGetN_wrong), "Left \"Unknown variable x3.\"")
   ]
 
 outputTypeTests :: [Test]
@@ -385,7 +389,30 @@ eLabelBreak_preservingConstraintsDespiteApplyingSignature =
       )
       (EVar "y")
 
+eGetN :: Exp
+eGetN =
+  ELet "foo" ENew $
+  ELet "_" (ESet "foo" "a" $ EInt 42) $
+  EGetN ["foo", "a"]
 
+eGetN_nested :: Exp
+eGetN_nested =
+  ELet "x1" ENew $
+  ELet "t2" ENew $
+  ELet "_" (ESet "t2" "x3" $ EInt 42) $
+  ELet "_" (ESet "x1" "x2" $ EVar "t2") $
+  EGetN ["x1", "x2", "x3"]
 
-    
+eSetN_nested :: Exp
+eSetN_nested =
+  ELet "x1" ENew $
+  ELet "_" (ESetN ["x1", "x2"] ENew) $
+  ELet "_" (ESetN ["x1", "x2", "x3"] $ EInt 42) $
+  EGetN ["x1", "x2", "x3"]
+
+eGetN_wrong :: Exp
+eGetN_wrong =
+  ELet "x1" ENew $
+  ELet "_" (ESetN ["x1", "x2"] ENew) $
+  EGetN ["x1", "x2", "x3"]
 

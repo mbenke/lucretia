@@ -22,6 +22,8 @@ data Exp
 
     | EGet Var Field
     | ESet Var Field Exp
+    | EGetN [Var]     -- ^ x1.x2...xn,     not in wp
+    | ESetN [Var] Exp -- ^ x1.x2...xn = e, not in wp
     | ELabel Label Type Exp
     | EBreak Label Exp
     | EFunc Func
