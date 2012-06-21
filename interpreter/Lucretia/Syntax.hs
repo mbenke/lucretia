@@ -12,7 +12,7 @@ data Exp
     | EBoolTrue
     | EBoolFalse
     | ENone
-
+    | EStr String
     | EVar Var
     | ELet Var Exp Exp
     | ELets Defs Exp

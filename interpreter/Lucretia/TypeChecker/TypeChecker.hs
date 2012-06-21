@@ -223,6 +223,8 @@ findType env ENew = do
 findType env (EInt _) = return TInt
 findType env EBoolTrue = return TBool
 findType env EBoolFalse = return TBool
+findType env (EStr _) = return TStr
+findType env ENone = return TNone
 
 -- ** Type information update (Definition 3.4 in wp)
 
