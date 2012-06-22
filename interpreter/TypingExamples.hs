@@ -31,7 +31,10 @@ t531 = tfunc [("Xs",emptyRecType)] [TVar "Xs",TInt] TNone
                [("Xs",oneFieldTRec "a" TInt)]
 e531 = efunc ["self","x"] t531 [ESet "self" "a" (EVar "x")]
 
-
+e531b = ECall f [new, 42] where
+  f =efunc ["self","x"] t (__ (ESet "self" "a" (EVar "x")) $ EVar "self")
+  t = tfunc [("Xs",emptyRecType)] [TVar "Xs",TInt] (TVar "Xs") 
+               [("Xs",oneFieldTRec "a" TInt)]
 -- Example 5.4.2; works: "(X1,[X1 < {self:X1}])"
 e542 = 
   ELet "o" new $
@@ -54,18 +57,8 @@ e543 =
     teq = (([TInt,TInt],[]) ==> (TBool,[]))  
 
 
--- Example 5.4.1; simplified
--- FAIL "ERROR:Expected condition (type: [Xs,int]; with constraints: [Xs < {}]) should be weaker or equal to actual condition (type: [X2,int]; with constraints: [X1 < {init:[Xs < {}] Xs int -> NoneType [Xs < {a:int}]}, X2 < {class:X1}]). They are not because: Expected record: [] should be weaker (have more fields) than actual record [(\"class\",X1)]."
+-- Example 5.4.1; simplified; works
 e541d = 
-  ELet "C" new $
-  ELet "_" (ESet "C" "init" e531) $
-  ELet "o" new $
-  ELet "_" (ESet "o" "class" (EVar "C")) $
-  ELet "f" (EGet "C" "init") $
-  (ECall (EVar "f") [EVar "o",42])
-  
--- here is what we want in the end; should be int
-e541 = 
   ELet "C" new $
   ELet "_" (ESet "C" "init" e531) $
   ELet "o" new $
@@ -73,6 +66,18 @@ e541 =
   ELet "f" (EGet "C" "init") $
   __ (ECall (EVar "f") [EVar "o",42]) $
   EGet "o" "a"
+  
+-- here is what we want in the end; should be int
+e541 = 
+  ELet "C" new $
+  ELet "_" (ESet "C" "init" e531) $
+  ELet "o" new $
+  ELet "_" (ESet "o" "class" (EVar "C")) $
+  ELet "c" (EGet "o" "class") $
+  ELet "f" (EGet "c" "init") $
+  __ (ECall (EVar "f") [EVar "o",42]) $
+  EGet "o" "class"
+  -- EVar "o"
 {-
 d541a = do
   dlet "m" new
@@ -109,7 +114,7 @@ e541e =
   ELet "C" new $
   ELet "_" (ESet "C" "init" e531) $
   ELet "o" new $
-  -- ELet "_" (ESet "o" "class" (EVar "C")) $
+  ELet "_" (ESet "o" "class" (EVar "C")) $
   ELet "f" (EGet "C" "init") $
   ECall (EVar "f") [EVar "o",42]
 

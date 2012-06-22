@@ -47,10 +47,12 @@ type Monomorphism = Set (TVar, TVar)
 monoRename :: Monomorphism -> Constraints -> Constraints
 monoRename m = mapCs (fromPairs . Set.toList $ m)
   where
-  fromPairs :: Eq a => [(a, b)] -> a -> b
-  fromPairs f a = snd . fromJust . find (\(a', _) -> a == a') $ f
   mapCs :: (TVar -> TVar) -> Constraints -> Constraints
-  mapCs f = Map.map $ mapRec f
+  mapCs f cs = Map.mapKeys f $ Map.map (mapRec f) cs
+  fromPairs :: [(TVar, TVar)] -> TVar -> TVar
+  fromPairs pairs = fromMap (Map.fromList pairs)
+  fromMap :: Map.Map TVar TVar -> TVar -> TVar 
+  fromMap map a = Map.findWithDefault a a map
   mapRec :: (TVar -> TVar) -> Rec -> Rec
   mapRec f = Map.map $ mapType f
   mapType :: (TVar -> TVar) -> Type -> Type
@@ -134,7 +136,7 @@ instance MonomorphicModuloNames (Map Var Type) where
       else Map.toAscList m `w'` Map.toAscList m'
     where
     w' :: [(Var, Type)] -> [(Var, Type)] -> M ()
-    w' ed al = [w s_ed al | s_ed <- subsequences al] `anyM` (throwError $ "Expected record: "++show ed++" should be weaker (have more fields) than actual record "++show al++".")
+    w' ed al = [w ed s_al | s_al <- subsequences al] `anyM` (throwError $ "Expected record: "++show ed++" should be weaker (have less fields) than actual record "++show al++".")
 
 instance MonomorphicModuloNames [(Var, Type)] where
   w = w `on` map snd
