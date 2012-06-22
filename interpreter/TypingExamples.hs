@@ -42,7 +42,13 @@ e542 =
   ELet "s" (EGet "o" "self") $
   EGet "s" "self"
 
--- Example 5.4.3; fails with: *** Exception: Map.find: element not in the map
+-- Example 5.4.3; FAILS with: *** Exception: Map.find: element not in the map
+-- because function fields should have environmente, e.g.
+--  { args = [TVar "Y"],
+--    psi =[("Xa",oneFieldTRec "w" TInt),("Y",oneFieldTRec "r" TInt)]
+--    gamma = [ ("a","Xa") ]  
+--  } 
+--     ==> (TBool,[])
 te543 = ([TVar "Y"],[("Xa",oneFieldTRec "w" TInt),("Y",oneFieldTRec "r" TInt)]) 
      ==> (TBool,[])
 
