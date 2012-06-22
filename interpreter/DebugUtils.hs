@@ -1,4 +1,4 @@
-module DebugUtils(traceShowId, traceShowIdHl) where
+module DebugUtils(traceShowId, traceShowIdHl, traceM) where
 
 import Debug.Trace
 
@@ -15,3 +15,5 @@ traceShowIdHl a = trace (
   "\n----------------------------------------\n"
   ) a
 
+traceM :: (Monad m,Show a) => a -> m ()
+traceM a = traceShow a $ return ()
