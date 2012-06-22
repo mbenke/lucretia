@@ -76,8 +76,8 @@ e541 =
   ELet "c" (EGet "o" "class") $
   ELet "f" (EGet "c" "init") $
   __ (ECall (EVar "f") [EVar "o",42]) $
-  EGet "o" "class"
-  -- EVar "o"
+  -- EGet "o" "class"
+  EVar "o"
 {-
 d541a = do
   dlet "m" new

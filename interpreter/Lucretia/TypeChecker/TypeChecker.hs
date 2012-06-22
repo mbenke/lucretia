@@ -229,7 +229,9 @@ findType env ENone = return TNone
 -- ** Type information update (Definition 3.4 in wp)
 
 mergeUpdate :: Constraints -> Constraints -> Constraints
-mergeUpdate = Map.unionWith seq
+mergeUpdate = Map.unionWith mergeUpdateRecord
+  where
+  mergeUpdateRecord = Map.unionWith $ flip const
 
 -- ** Helper functions
 
