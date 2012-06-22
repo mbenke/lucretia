@@ -72,10 +72,10 @@ preludeStmts =
   ]
 
 eStr :: Exp
-eStr = EString "whatever"
+eStr = EStr "whatever"
 
 notImplementedYet :: Exp
-notImplementedYet = ECall (EVar "print") [EString "Not implemented yet"]
+notImplementedYet = ECall (EVar "print") [EStr "Not implemented yet"]
 
 cIdent :: Ident a -> String
 cIdent name@(Ident {}) = ident_string name
