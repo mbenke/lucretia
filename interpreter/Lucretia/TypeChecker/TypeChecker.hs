@@ -149,7 +149,7 @@ findType env (EVar x) = getType env x
 -- -T  stands for Type
 -- -Cs stands for Constraints
 findType env (EFunc (Func edPreVars expectedFunctionType eBody)) = do
-  let TFunc edPreCs edPreTs edPostT edPostCs = expectedFunctionType
+  let TFunc edPreCs edEnv edPreTs edPostT edPostCs = expectedFunctionType
   (length edPreVars == length edPreTs) `orFail` "Number of arguments and number of their types do not match"
   let params = zip edPreVars edPreTs
   let extendedEnv = foldl (\envAccumulator (eXi, tXi) -> Map.insert eXi tXi envAccumulator) env params
@@ -167,7 +167,7 @@ findType env (EFunc (Func edPreVars expectedFunctionType eBody)) = do
 findType env (ECall funcE alPreEs) = do
   let funcName = findName env funcE
 
-  TFunc edPreCs edPreTs edPostT edPostCs <- findTypeCleanConstraints env funcE
+  TFunc edPreCs edEnv edPreTs edPostT edPostCs <- findTypeCleanConstraints env funcE
 
   (length alPreEs == length edPreTs) `orFail` ("Function "++funcName++" is applied to "++show (length alPreEs)++" parameters, but "++show (length edPreTs)++" parameters should be provided.\n")
   
@@ -180,7 +180,7 @@ findType env (ECall funcE alPreEs) = do
 
 -- Control flow with break instructions (label)
 findType env (ELabel name expectedFunctionType eBody) = do
-  let TFunc _ _ edPostT edPostCs = expectedFunctionType
+  let TFunc _ edEnv _ edPostT edPostCs = expectedFunctionType
   let extendedEnv = Map.insert name expectedFunctionType env
 
   alPreCs <- access constraints
@@ -194,7 +194,7 @@ findType env (ELabel name expectedFunctionType eBody) = do
 -- Control flow with break instructions (break)
 findType env (EBreak name eBody) = do
   Map.member name env `orFail` ("Label "++name++" was not declared.")
-  let TFunc _ _ edPostT edPostCs = env Map.! name
+  let TFunc _ edEnv _ edPostT edPostCs = env Map.! name
   let extendedEnv = env
 
   alPreCs <- access constraints

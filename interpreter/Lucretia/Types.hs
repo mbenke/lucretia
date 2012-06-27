@@ -28,7 +28,7 @@ data Type
   | TRec Rec -- ^ @t_r@ in wp
   | TOr (Set Type) -- ^ @t_b,1 v t_b,2@ in wp
   | TFieldUndefined -- ^ @_|_@ in wp
-  | TFunc Constraints [Type] Type Constraints -- ^ @[t1, …, tn; Psi_1] => [tn+1; \Psi_2]@ in wp
+  | TFunc Constraints Env [Type] Type Constraints -- ^ @[t1, …, tn; Psi_1] => [tn+1; \Psi_2]@ in wp
   | TAny
   deriving (Eq, Ord)
 
@@ -113,6 +113,12 @@ showRec r = concat ["{",showFields fields,"}"] where
   showFields fields = intercalate ", " (map showField fields)
   showField (l,t) = concat [l,":",show t]
   
+showEnv :: Env -> String
+showEnv e = showPairs pairs where
+  pairs = Map.toList e 
+  showPairs pairs = intercalate ", " (map showPair pairs)
+  showPair (l,t) = concat [l,":",show t]
+  
 instance Show Type where
   show TInt = "int"
   show TBool = "bool"
@@ -122,7 +128,11 @@ instance Show Type where
   show (TRec r) = showRec r
   show (TOr ts) = intercalate " v " $ map show $ Set.toList ts
   show (TFieldUndefined) = "undefined"
-  show (TFunc constraintsBefore paramTypes bodyType constraintsAfter) = showConstraints constraintsBefore ++ " " ++ intercalate " " (map show paramTypes) ++ " -> " ++ show bodyType ++ " " ++ showConstraints constraintsAfter
+  show (TFunc constraintsBefore env paramTypes bodyType constraintsAfter) = 
+    concat [showConstraints constraintsBefore,";",showEnv env, ";",
+            intercalate " " (map show paramTypes), " -> ", 
+            show bodyType, " ", showConstraints constraintsAfter
+           ]
   show TAny = "any-type"
 
 

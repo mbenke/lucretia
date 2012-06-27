@@ -180,7 +180,8 @@ e551 = efunc [] typ body where
 t e = either ("ERROR:"++) show (runCheck e)
 new = ENew
 
-tfunc before params result after = 
+tfunc before params result after = tfunc2 before Map.empty params result after 
+tfunc2 before envparams result after =
   TFunc (M.fromList before) params result (M.fromList after)
 (p,b) ==> (r,a) = tfunc b p r a
 
