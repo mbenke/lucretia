@@ -22,8 +22,8 @@ import MapLenses (mapInsertLens)
 data Type
   = TInt -- ^ @c@ in wp
   | TBool -- ^ @c@ in wp
-  | TStr
-  | TNone -- Python NoneType
+  | TStr -- ^ @c@ in wp
+  | TNone -- ^ @c@ in wp
   | TVar TVar -- ^ @X@ in wp
   | TRec Rec -- ^ @t_r@ in wp
   | TOr (Set Type) -- ^ @t_b,1 v t_b,2@ in wp
@@ -134,5 +134,4 @@ instance Show Type where
             show bodyType, " ", showConstraints constraintsAfter
            ]
   show TAny = "any-type"
-
 
