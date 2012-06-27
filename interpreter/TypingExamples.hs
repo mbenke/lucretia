@@ -49,7 +49,7 @@ e542 =
 --    gamma = [ ("a","Xa") ]  
 --  } 
 --     ==> (TBool,[])
-te543 = ([TVar "Y"],[("Xa",oneFieldTRec "w" TInt),("Y",oneFieldTRec "r" TInt)]) 
+te543 = ([TVar "Y"],[("a",TVar "Xa")],[("Xa",oneFieldTRec "w" TInt),("Y",oneFieldTRec "r" TInt)]) 
      ==> (TBool,[])
 
 e543 = 
@@ -60,7 +60,7 @@ e543 =
      efunc ["y"] te543 
        (ECall (EVar "eq") [EGet "a" "w",EGet "y" "r"]) 
   where
-    teq = (([TInt,TInt],[]) ==> (TBool,[]))  
+    teq = (([TInt,TInt],[],[]) ==> (TBool,[]))  
 
 
 -- Example 5.4.1; simplified; works
@@ -180,10 +180,10 @@ e551 = efunc [] typ body where
 t e = either ("ERROR:"++) show (runCheck e)
 new = ENew
 
-tfunc before params result after = tfunc2 before Map.empty params result after 
-tfunc2 before envparams result after =
-  TFunc (M.fromList before) params result (M.fromList after)
-(p,b) ==> (r,a) = tfunc b p r a
+tfunc before params result after = tfunc2 before [] params result after 
+tfunc2 before env params result after =
+  TFunc (M.fromList before) (M.fromList env) params result (M.fromList after)
+(p,e,b) ==> (r,a) = tfunc2 b e p r a
 
 efunc args typ body = EFunc $ Func args typ (toExp body)
 
