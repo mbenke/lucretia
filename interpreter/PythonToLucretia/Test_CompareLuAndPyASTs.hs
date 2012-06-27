@@ -2,16 +2,18 @@ module Lucretia.Test_CompareLuAndPyASTs(main) where
 
 import Control.Monad.Error
 import Language.Python.Version3 
+import qualified Language.Python.Common.Pretty as Py (pretty)
+import Language.Python.Common.PrettyAST
 
 import Diff(diff)
 
+import PythonToLucretia.PythonToLucretia (pyToLu)
+import qualified Lucretia.PrettyPrint as Lu (pretty)
 import Lucretia.Syntax
-import Lucretia.Interpreter
-import qualified Lucretia.ApplicativeParser as Parser
-
-import PythonToLucretia.Converter
 
 {- TODO
+
+Way of testing presented below is deprecated because python code maybe translated to a code in lucretia that not necessarily could be interpreted. The aim of translation of a programme is to preserve type-checkedness of it.
 
 testy:
 Weryfikacja: Sprawdzenie poprawności tłumaczenia PyAST -> LuAST.
@@ -32,15 +34,16 @@ Refactor: use HUnit in Test_CompareLuAndPyASTs
 
 main :: IO ()
 main = do
-  printPyAndLuASTs "TestByPyOutput/print.py"
+  printPyAndLuASTs "PythonToLucretia/tests/print_01.py"
 
 printPyAndLuASTs codeFileName = do
   code           <- readFile codeFileName
   let (Right (pyAST, _)) = parseModule code codeFileName
-  let luAST = convertLucreciaASTToPythonAST pyAST
+  let luAST = pyToLu pyAST
 
-  putStrLn $ ""
-  putStrLn $ "===================="
-  putStrLn $ show $ pyAST
-  putStrLn $ show $ luAST
+  putStrLn ""
+  putStrLn "===================="
+  print pyAST
+  print . Lu.pretty $ luAST
+  print . Py.pretty $ pyAST
 

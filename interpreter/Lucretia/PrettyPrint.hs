@@ -1,9 +1,10 @@
 {-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
 
-module Lucretia.PrettyPrint where
+module Lucretia.PrettyPrint (pretty) where
 
 import Text.PrettyPrint
 import PrettyPrintUtils
+import Data.List (intercalate)
 
 import Lucretia.Definitions
 import Lucretia.Syntax
@@ -13,6 +14,7 @@ instance Pretty Exp where
   pretty (EInt n) = integer n
   pretty (EBoolTrue) = text "True"
   pretty (EBoolFalse) = text "False"
+  pretty (EStr s) = text . show $ s
   pretty (ENone) = text "None"
 
   pretty (EVar x) = text x
@@ -38,8 +40,10 @@ instance Pretty Exp where
     ]
   pretty ENew = text "new"
 
-  pretty (EGet x a) = text $ x++"."++a
-  pretty (ESet x a e) = (text $ x++"."++a++" =") <+> pretty e
+  pretty (EGet x a) = pretty $ EGetN [x, a]
+  pretty (ESet x a e) = pretty $ ESetN [x, a] e
+  pretty (EGetN xs) = text $ intercalate "." xs
+  pretty (ESetN xs e) = (text $ intercalate "." xs) <+> char '=' <+> pretty e
   pretty (ELabel l t e) =
     vcat
     [ text l <+> char '.' <+> pretty t <+> char '{'
@@ -62,7 +66,7 @@ instance Pretty Exp where
   pretty (EAdd e e') = op e "+" e'
   pretty (EMul e e') = op e "*" e'
 
-  pretty _ = text "__"
+  pretty _ = text "**"
 
 op :: Exp -> String -> Exp -> Doc
 op e o e' = pretty e <+> text o <+> pretty e'

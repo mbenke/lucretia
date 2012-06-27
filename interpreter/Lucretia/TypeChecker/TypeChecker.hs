@@ -51,6 +51,8 @@ import Lucretia.Types
 import Lucretia.Syntax
 import Lucretia.TypeChecker.MonomorphicModuloNames (weakerOrEqualTo, monoRename)
 
+accessRecord :: Env -> Var -> CM Env
+accessRecord env x = getTVar env x >>= access . record -- TODO OPT RTR using lenses with errors library
 
 -- * Type checker rules (/3. The type system/ in wp)
 
@@ -61,20 +63,43 @@ findType env (ESet x a e) = do
   tX <- getTVar env x
   t2 <- findTypeCleanConstraints env e
   field a tX ~= Just t2
-  return (TVar tX)
-    where
+  return $ TVar tX
 
---  Record access (access)
+-- Record access (access)
 findType env (EGet x a) = do
   v <- getTVar env x
   u <- accessField a v
   doesNotHaveBottom u `orFail` (x++"."++a++" may be undefined.")
   return u
+  where
+  accessField :: Field -> TVar -> CM Type
+  accessField a v = do
+    contains a v
+    Just u <- access $ field a v
+    return u
+  doesNotHaveBottom :: Type -> Bool
+  doesNotHaveBottom TFieldUndefined = False
+  doesNotHaveBottom (TOr t) = all doesNotHaveBottom t
+  doesNotHaveBottom _ = True
+
+-- TODO OPT RTR using lenses with failure: fclabels, http://brandon.si/code/haskell-state-of-the-lens/
+
+-- Nested record update, not in wp
+findType env (ESetN xs e) = do
+  v <- unpackTVar =<< (findType env $ EGetN $ init xs)
+  t <- findType env e
+  field (last xs) v ~= Just t
+  return $ TVar v
+
+-- Nested record access, not in wp
+-- TODO not bottom
+findType env (EGetN xs) =
+  eGetN xs env
     where
-    doesNotHaveBottom :: Type -> Bool
-    doesNotHaveBottom TFieldUndefined = False
-    doesNotHaveBottom (TOr t) = all doesNotHaveBottom t
-    doesNotHaveBottom _ = True
+    eGetN :: [Var] -> Env -> CM Type
+    eGetN [x] env = getType env x
+    eGetN (x:xs) env = eGetN xs =<< access . record =<< getTVar env x
+
 
 -- Conditional instruction (if)
 findType env i@(EIf eIf eThen eElse) = do
@@ -225,6 +250,13 @@ findType env EBoolTrue = return TBool
 findType env EBoolFalse = return TBool
 findType env (EStr _) = return TStr
 findType env ENone = return TNone
+findType env (EAdd e e') = do
+  t  <- findType env e
+  t' <- findType env e'
+  (t /= TNone && t' /= TNone)
+    `orFail` ("TypeError: unsupported operand type(s) for +: "
+             ++show t++" and "++show t')
+  return TInt
 
 -- ** Type information update (Definition 3.4 in wp)
 
@@ -236,13 +268,15 @@ mergeUpdate = Map.unionWith mergeUpdateRecord
 -- ** Helper functions
 
 getTVar :: Env -> TVar -> CM TVar
-getTVar env x = unpack =<< getType env x
-  where unpack (TVar tVar) = return tVar
-	unpack t = throwError $ "Variable "++x++": type mismatch: expected record type, but got "++show t++"."
+getTVar env x = unpackTVar =<< getType env x
+
+unpackTVar :: Type -> CM TVar
+unpackTVar (TVar tVar) = return tVar
+unpackTVar t = throwError $ "Variable type mismatch: expected record type, but got "++show t++"."
 
 getType :: Env -> Var -> CM Type
 getType env x = case Map.lookup x env of
-  Nothing -> throwError $ "Unknown variable "++x
+  Nothing -> throwError $ "Unknown variable "++x++"."
   Just t -> return t
 
 findName :: Env -> Exp -> Var
@@ -261,11 +295,6 @@ contains a tvar = do
 	Nothing -> throwError $ "Record "++showRec rec++" does not contain field "++a
 	_ -> return ()
 
-accessField :: Field -> TVar -> CM Type
-accessField a v = do
-  contains a v
-  Just u <- access $ field a v
-  return u
   
 -- ** Merging functions (@Bishop@ relation in /Conditional instruction/ in wp)
 
