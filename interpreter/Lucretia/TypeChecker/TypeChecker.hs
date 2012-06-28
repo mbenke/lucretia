@@ -205,6 +205,7 @@ findType env (ECall funcE alPreEs) = do
 
 -- Control flow with break instructions (label)
 findType env (ELabel name expectedFunctionType eBody) = do
+  ensureFunctionType expectedFunctionType 
   let TFunc _ edEnv _ edPostT edPostCs = expectedFunctionType
   let extendedEnv = Map.insert name expectedFunctionType env
 
@@ -215,7 +216,10 @@ findType env (ELabel name expectedFunctionType eBody) = do
 
   constraints ~= alPreCs `mergeUpdate` monoRename mono edPostCs
   return edPostT
-
+  where
+    ensureFunctionType (TFunc _ _ _ _ _) = return ()
+    ensureFunctionType t = throwError "The declared type for a label should be a function"
+    
 -- Control flow with break instructions (break)
 findType env (EBreak name eBody) = do
   Map.member name env `orFail` ("Label "++name++" was not declared.")

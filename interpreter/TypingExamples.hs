@@ -165,10 +165,18 @@ e544 =  let {
     (ELet "f" (EGet "o" "m") (ECall (EVar "f") []))
     (ELet "f" (EGet "C" "m") (ECall (EVar "f") [EVar "o"]))
 
--- Example 5.5.1; FAIL: "*** Exception: Lucretia/TypeChecker/TypeChecker.hs:197:7-49: Irrefutable pattern failed for pattern Lucretia.Types.TFunc _
+-- Example 5.5.1; works: "([];; -> int [],[])"
 e551 = efunc [] typ body where
   typ = tfunc [] [] TInt []
-  body = ELabel "return" TInt $
+  ltyp = typ
+  body = ELabel "return" ltyp $
+    EBreak "return" 7
+
+-- Example 5.5.1; FAIL: "*** Exception: Lucretia/TypeChecker/TypeChecker.hs:197:7-49: Irrefutable pattern failed for pattern Lucretia.Types.TFunc _
+e551b = efunc [] typ body where
+  typ = tfunc [] [] TInt []
+  ltyp = TInt
+  body = ELabel "return" ltyp $
     EBreak "return" 7
 
 -- Auxiliary
