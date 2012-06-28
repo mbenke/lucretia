@@ -42,15 +42,11 @@ e542 =
   ELet "s" (EGet "o" "self") $
   EGet "s" "self"
 
--- Example 5.4.3; FAILS with: *** Exception: Map.find: element not in the map
--- because function fields should have environmente, e.g.
---  { args = [TVar "Y"],
---    psi =[("Xa",oneFieldTRec "w" TInt),("Y",oneFieldTRec "r" TInt)]
---    gamma = [ ("a","Xa") ]  
---  } 
---     ==> (TBool,[])
-te543 = ([TVar "Y"],[("a",TVar "Xa")],[("Xa",oneFieldTRec "w" TInt),("Y",oneFieldTRec "r" TInt)]) 
-     ==> (TBool,[])
+-- Example 5.4.3; works: (X1,[X1 < {equals:[Xa < {w:int},Y < {r:int}];a:Xa, eq:[];;int int -> bool [];Y -> bool [], w:int}])
+te543 = ([TVar "Y"],[("a",TVar "Xa"),("eq",teq)],[("Xa",oneFieldTRec "w" TInt),("Y",oneFieldTRec "r" TInt)]) 
+     ==> (TBool,[])  where
+    teq = (([TInt,TInt],[],[]) ==> (TBool,[]))  
+
 
 e543 = 
   ELet "eq" ( efunc ["a","b"] teq True) $

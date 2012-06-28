@@ -177,7 +177,7 @@ findType env (EFunc (Func edPreVars expectedFunctionType eBody)) = do
   let TFunc edPreCs edEnv edPreTs edPostT edPostCs = expectedFunctionType
   (length edPreVars == length edPreTs) `orFail` "Number of arguments and number of their types do not match"
   let params = zip edPreVars edPreTs
-  let extendedEnv = foldl (\envAccumulator (eXi, tXi) -> Map.insert eXi tXi envAccumulator) env params
+  let extendedEnv = foldl (\envAccumulator (eXi, tXi) -> Map.insert eXi tXi envAccumulator) edEnv params
 
   stateBeforeBody <- get
   constraints ~= edPreCs
