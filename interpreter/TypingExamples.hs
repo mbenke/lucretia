@@ -6,9 +6,10 @@ import Lucretia.Syntax
 import Lucretia.Types
 import qualified Data.Map as M
 
-edo :: [Exp] -> Exp
-edo [] = ENone
-edo (e:es) = __ e (edo es)
+-- Use this function for interactive testing, e.g.
+-- test e521
+test :: Exp -> String
+test e = either ("ERROR:"++) show (runCheck e)
 
 -- Example 5.2.1; works: "(X1,[X1 < {c:string}])"
 e521 = ELet "ha" EBoolTrue $
@@ -165,6 +166,21 @@ e544 =  let {
     (ELet "f" (EGet "o" "m") (ECall (EVar "f") []))
     (ELet "f" (EGet "C" "m") (ECall (EVar "f") [EVar "o"]))
 
+-- Example 5.4.5;
+te545 = tfunc2 conm env [TInt] TInt conm where
+            conm = [("Xm", M.fromList [("f",te545),("eq",teq)])]
+            env = [("m",TVar"Xm")]              
+            
+teq = (([TInt,TInt],[],[]) ==> (TBool,[]))  
+tmul = (([TInt,TInt],[],[]) ==> (TBool,[]))  
+e545 = undefined
+
+te545b = tfunc2 conm env [TInt] TInt conm where
+   conm = [("Xm", M.fromList [("f",tf)])]
+   env = [("m",TVar"Xm")] 
+   tf = tfunc [] [TInt] TInt []
+e545b = efunc ["n"] te545b $ ELet "f" (EGet "m" "f") b 
+        where b = ECall (EVar "f") [EVar "n"]
 -- Example 5.5.1; works: "([];; -> int [],[])"
 e551 = efunc [] typ body where
   typ = tfunc [] [] TInt []
@@ -172,7 +188,7 @@ e551 = efunc [] typ body where
   body = ELabel "return" ltyp $
     EBreak "return" 7
 
--- Example 5.5.1; FAIL: "*** Exception: Lucretia/TypeChecker/TypeChecker.hs:197:7-49: Irrefutable pattern failed for pattern Lucretia.Types.TFunc _
+-- Example 5.5.1b; works, expected error: label type not a TFunc
 e551b = efunc [] typ body where
   typ = tfunc [] [] TInt []
   ltyp = TInt
@@ -181,7 +197,6 @@ e551b = efunc [] typ body where
 
 -- Auxiliary
 
-t e = either ("ERROR:"++) show (runCheck e)
 new = ENew
 
 tfunc before params result after = tfunc2 before [] params result after 
@@ -197,6 +212,10 @@ __ e = ELet "_" e
 --eif :: (ToExp t, ToExp e) => Exp -> t -> e -> Exp
 --eif c t e = EIf (toExp c) (toExp t) (toExp e)
 eif c t e = EIf c (edo t) (edo e)
+
+edo :: [Exp] -> Exp
+edo [] = ENone
+edo (e:es) = __ e (edo es)
 
 class ToExp a where
   toExp :: a -> Exp  
