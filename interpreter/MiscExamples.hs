@@ -1,20 +1,19 @@
 {-# LANGUAGE FlexibleInstances #-}
 
 import Lucretia.Definitions
-import Lucretia.TypeChecker.TypeChecker (runCheck,checkProg)
+import Lucretia.TypeChecker.TypeChecker (runCheck)
 import Lucretia.Syntax
 import Lucretia.Types
 import qualified Data.Map as M
 
-eInt :: Exp
-eInt = 42
+eInt42 :: Exp
+eInt42 = 42
 
 new = ENew
 
 
 t e = either ("ERROR:"++) show (runCheck e)
--- tp p = either ("ERROR:"++) show (checkProg p)
-t1 = t eInt
+t1 = t eInt42
 t2 = t new
 elsenone = ENone
 edo :: [Exp] -> Exp
@@ -42,9 +41,8 @@ instance ToExp (D a) where
 --  toExp (D a v e) = toExp a
   
 instance ToExp Bool where
-  toExp True = EBoolTrue
-  toExp False = EBoolFalse
-  
+  toExp = EBool
+
 instance ToExp Integer where
   toExp = EInt
   
@@ -77,18 +75,18 @@ dif c t e = de $ EIf (toExp c) (toExp t) (toExp e)
 -- Example
 -- d1 :: D Exp
 d1 = do
-  dlet "ha" EBoolTrue
+  dlet "ha" eTrue
   dlet "m" ENew
   de $ EVar "m"
   
 -- End of HACK
-e521 = ELet "ha" EBoolTrue $
+e521 = ELet "ha" eTrue $
        ELet "m"  ENew $
        EIf (EVar "ha")
          (ESet "m" "c" (EStr "arg"))
          (ESet "m" "c" (EStr "help"))
 
-e522 = ELet "ha" EBoolTrue $
+e522 = ELet "ha" eTrue $
        ELet "m"  ENew $
        ELet "" (eif_ (EVar "ha")
          [ESet "m" "c" (EStr "arg")]
@@ -104,37 +102,26 @@ d522 = do
          ()
   de m
 
-tfunc before params result after = 
-  TFunc (M.fromList before) params result (M.fromList after)
-(p,b) ==> (r,a) = tfunc b p r a
 
-efunc args typ body = EFunc $ Func args typ (toExp body)
+efunc args body = EFunDecl args $ toExp body
 
-t531 =   tfunc [("Xs",emptyRecType)] [TVar "Xs",TInt] TNone 
-               [("Xs",oneFieldTRec "a" TInt)]
-e531 = efunc ["self","x"] t531 [ESet "self" "a" (EVar "x")]
+e531 = efunc ["self","x"] [ESet "self" "a" (EVar "x")]
 
 
 {-e543 = toExp $ do
   a <- dlet "a" ENew
-  let te = ([TVar "Y"],[("Xa",oneFieldTRec "w" TInt)]) ==> (TBool,[])
-  ESet "a" "equals" $ efunc ["y"] te [ESet "a" "w" (EGet "y" "r")]
+  ESet "a" "equals" $ efunc ["y"] [ESet "a" "w" (EGet "y" "r")]
   de a
 -}
 
-te543 = ([TVar "Y"],[("Xa",oneFieldTRec "w" TInt),("Y",oneFieldTRec "r" TInt)]) 
-     ==> (TBool,[])
-
-e543 = 
-  ELet "eq" ( efunc ["a","b"] teq True) $
+e543 =
+  ELet "eq" ( efunc ["a","b"] True) $
   ELet "a" ENew $ 
   ELet "_" (ESet "a" "w" 0) $
   ESet "a" "equals" $ 
-     efunc ["y"] te543 
-       (ECall (EVar "eq") [EGet "a" "w",EGet "y" "r"]) 
-  where
-    teq = (([TInt,TInt],[]) ==> (TBool,[]))  
-{-    
+     efunc ["y"]
+       (EFunCall (EVar "eq") [EGet "a" "w",EGet "y" "r"])
+{-
 eget' :: Exp -> [Field] -> Exp
 eget' e [] = e
 eget' (EVar v) [f] = EGet v f
@@ -158,27 +145,25 @@ d541a = do
   -- de $ ESet "m" "C" new
   c <- dlet "C" new
   
-  let tinit = tfunc  [("Xs",emptyRecType)] [TVar "Xs",TInt]
-                 TNone [("Xs",oneFieldTRec "a" TInt)]
-  let init = efunc ["self","x"] tinit [ESet "self" "a" (EVar "x")]
+  let init = efunc ["self","x"] [ESet "self" "a" (EVar "x")]
   dset "C" "init" init
   o <- dlet "o" new
   dset "o" "class" c
   f <- dlet "f" (EGet "C" "init")
-  de $ ECall f [o,42]
+  de $ EFunCall f [o,42]
   dget "o" "a"
   
 e541b = 
   ELet "o" new $
   ELet "_" (ESet "o" "foo" 13) $
-  ECall e531 [EVar "o", 42]
+  EFunCall e531 [EVar "o", 42]
 
 e541c = 
   ELet "o" new $
   ELet "_" (ESet "o" "foo" 13) $
   ELet "_" (ESet "o" "init" e531) $
   ELet "f" (EGet "o" "init") $
-  ECall (EVar "f") [EVar "o",42]
+  EFunCall (EVar "f") [EVar "o",42]
 
 
 e541d = 
@@ -187,7 +172,7 @@ e541d =
   ELet "o" new $
   ELet "_" (ESet "o" "class" (EVar "C")) $
   ELet "f" (EGet "C" "init") $
-  ECall (EVar "f") [EVar "o",42]
+  EFunCall (EVar "f") [EVar "o",42]
 
 e541e = 
   ELet "C" new $
@@ -195,7 +180,7 @@ e541e =
   ELet "o" new $
   -- ELet "_" (ESet "o" "class" (EVar "C")) $
   ELet "f" (EGet "C" "init") $
-  ECall (EVar "f") [EVar "o",42]
+  EFunCall (EVar "f") [EVar "o",42]
 
 -- Example 5.4.4
 {-
@@ -232,14 +217,12 @@ let f = ifhasattr(o,m) then o.m() else o.class.m(o)
 __ :: Exp -> Exp -> Exp
 __ e = ELet "_" e
 e544 =  let {
-    tm = tfunc [("Xs",emptyRecType)] [TVar "Xs"] TInt [] ;
-    tm7 = tfunc [] [] TInt [] } in
   ELet "C" new $
-  __ (ESet "C" "m" $ efunc ["self"] tm (EInt 13)) $
-  ELet "m7"  (efunc [] tm7 (EInt 13)) $
+  __ (ESet "C" "m" $ efunc ["self"] (EInt 13)) $
+  ELet "m7"  (efunc [] (EInt 13)) $
   ELet "o" new $
   __ (ESet "o" "m" (EVar "m7")) $
   EIfHasAttr "o" "m" 
-    (ELet "f" (EGet "o" "m") (ECall (EVar "f") []))
-    (ELet "f" (EGet "C" "m") (ECall (EVar "f") [EVar "o"]))
+    (ELet "f" (EGet "o" "m") (EFunCall (EVar "f") []))
+    (ELet "f" (EGet "C" "m") (EFunCall (EVar "f") [EVar "o"]))
 

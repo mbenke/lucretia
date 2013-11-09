@@ -9,42 +9,27 @@ type Def = (Var, Exp)
 
 data Exp 
     = EInt Integer
-    | EBoolTrue
-    | EBoolFalse
+    | EBool Bool
     | EStr String
-    | ENone
-    | EVar Var
-    | ELet Var Exp Exp
-    | ELets Defs Exp
-    | EIf Exp Exp Exp
-    | EIfHasAttr Var Field Exp Exp
+    | ENone -- ^ () in wp
     | ENew
-
-    | EGet Var Field
-    | ESet Var Field Exp
-    | EGetN [Var]     -- ^ x1.x2...xn,     not in wp
-    | ESetN [Var] Exp -- ^ x1.x2...xn = e, not in wp
-    | ELabel Label Type Exp
-    | EBreak Label Exp
-    | EFunc Func
-    | ECall Exp [Exp]
 
     | EAdd Exp Exp
     | EMul Exp Exp
 
-    | EDeref Exp 
+    | EVar Var
+    | ELet Var Exp Exp
+
+    | EGet Var Field
+    | ESet Var Field Exp
+
+    | EIf Exp Exp Exp
+    | EIfHasAttr Var Field Exp Exp
+
+    | EFunDecl [Var] Exp
+    | EFunCall Exp [Exp]
 
       deriving (Eq,Show)
-
-data Func = Func [Param] Type Exp deriving (Eq,Show)
-
-instance Num Exp where
-    fromInteger = EInt
-    (+) = EAdd
-    (*) = undefined
-    (-) = undefined
-    signum = undefined
-    abs = undefined
 
 programFromExp :: Exp -> Program
 programFromExp e = [("_",e)]

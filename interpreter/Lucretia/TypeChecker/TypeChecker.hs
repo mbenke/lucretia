@@ -82,25 +82,6 @@ findType env (EGet x a) = do
   doesNotHaveBottom (TOr t) = all doesNotHaveBottom t
   doesNotHaveBottom _ = True
 
--- TODO OPT RTR using lenses with failure: fclabels, http://brandon.si/code/haskell-state-of-the-lens/
-
--- Nested record update, not in wp
-findType env (ESetN xs e) = do
-  v <- unpackTVar =<< (findType env $ EGetN $ init xs)
-  t <- findType env e
-  field (last xs) v ~= Just t
-  return $ TVar v
-
--- Nested record access, not in wp
--- TODO not bottom
-findType env (EGetN xs) =
-  eGetN xs env
-    where
-    eGetN :: [Var] -> Env -> CM Type
-    eGetN [x] env = getType env x
-    eGetN (x:xs) env = eGetN xs =<< access . record =<< getTVar env x
-
-
 -- Conditional instruction (if)
 findType env i@(EIf eIf eThen eElse) = do
   TBool <- findTypeCleanConstraints env eIf
@@ -114,7 +95,7 @@ findType env i@(EIf eIf eThen eElse) = do
   tElse <- findTypeCleanConstraints env eElse
   stateAfterElse <- get
 
-  (tThen `eqOrAny` tElse) `orFail` ("Type after then: "++show tThen++" does not match type after else: "++show tElse++". In "++show i)
+  (tThen == tElse) `orFail` ("Type after then: "++show tThen++" does not match type after else: "++show tElse++". In "++show i)
 
   put $ mergeStates stateAfterThen stateAfterElse
   return tThen
@@ -132,7 +113,7 @@ findType env i@(EIfHasAttr x a eThen eElse) = do
   tElse <- findTypeCleanConstraints env eElse
   stateAfterElse <- get
 
-  (tThen `eqOrAny` tElse) `orFail` ("Type after then: "++show tThen++" does not match type after else: "++show tElse++". In "++show i)
+  (tThen == tElse) `orFail` ("Type after then: "++show tThen++" does not match type after else: "++show tElse++". In "++show i)
 
   put $ mergeStates stateAfterThen stateAfterElse
   return tThen
@@ -173,23 +154,11 @@ findType env (EVar x) = getType env x
 -- -Post- stands for Post(contidions)
 -- -T  stands for Type
 -- -Cs stands for Constraints
-findType env (EFunc (Func edPreVars expectedFunctionType eBody)) = do
-  let TFunc edPreCs edEnv edPreTs edPostT edPostCs = expectedFunctionType
-  (length edPreVars == length edPreTs) `orFail` "Number of arguments and number of their types do not match"
-  let params = zip edPreVars edPreTs
-  let extendedEnv = foldl (\envAccumulator (eXi, tXi) -> Map.insert eXi tXi envAccumulator) edEnv params
-
-  stateBeforeBody <- get
-  constraints ~= edPreCs
-  alPostT <- findTypeCleanConstraints extendedEnv eBody
-  alPostCs <- access constraints
-  (edPostT, edPostCs) `weakerOrEqualTo` (alPostT, alPostCs)
-  put stateBeforeBody
-
-  return expectedFunctionType
+findType env (EFunDecl edPreVars eBody) = do
+  return TNone
 
 -- Function call (fapp)
-findType env (ECall funcE alPreEs) = do
+findType env (EFunCall funcE alPreEs) = do
   let funcName = findName env funcE
 
   TFunc edPreCs edEnv edPreTs edPostT edPostCs <- findTypeCleanConstraints env funcE
@@ -203,44 +172,11 @@ findType env (ECall funcE alPreEs) = do
   constraints ~= alPreCs `mergeUpdate` monoRename mono edPostCs
   return edPostT
 
--- Control flow with break instructions (label)
-findType env (ELabel name expectedFunctionType eBody) = do
-  ensureFunctionType expectedFunctionType 
-  let TFunc _ edEnv _ edPostT edPostCs = expectedFunctionType
-  let extendedEnv = Map.insert name expectedFunctionType env
-
-  alPreCs <- access constraints
-  alPostT <- findTypeCleanConstraints extendedEnv eBody
-  alPostCs <- access constraints
-  mono <- (edPostT, edPostCs) `weakerOrEqualTo` (alPostT, alPostCs)
-
-  constraints ~= alPreCs `mergeUpdate` monoRename mono edPostCs
-  return edPostT
-  where
-    ensureFunctionType (TFunc _ _ _ _ _) = return ()
-    ensureFunctionType t = throwError "The declared type for a label should be a function"
-    
--- Control flow with break instructions (break)
-findType env (EBreak name eBody) = do
-  Map.member name env `orFail` ("Label "++name++" was not declared.")
-  let TFunc _ edEnv _ edPostT edPostCs = env Map.! name
-  let extendedEnv = env
-
-  alPreCs <- access constraints
-  alPostT <- findTypeCleanConstraints extendedEnv eBody
-  alPostCs <- access constraints
-  mono <- (edPostT, edPostCs) `weakerOrEqualTo` (alPostT, alPostCs)
-
-  constraints ~= emptyConstraints
-  return TAny
-
 -- Let-expression (let)
 findType env (ELet x e1 e0) = do  
   t1 <- findTypeCleanConstraints env e1
   let env' = extendEnv x t1 env
   findTypeCleanConstraints env' e0
-findType env (ELets [] e0) = findTypeCleanConstraints env e0
-findType env (ELets ((x,e):ds) e0) = findTypeCleanConstraints env (ELet x e (ELets ds e0))
 
 -- Object creation (new)
 findType env ENew = do
@@ -250,8 +186,7 @@ findType env ENew = do
 
 -- Other rules, not mentioned in the white paper
 findType env (EInt _) = return TInt
-findType env EBoolTrue = return TBool
-findType env EBoolFalse = return TBool
+findType env (EBool _) = return TBool
 findType env (EStr _) = return TStr
 findType env ENone = return TNone
 findType env (EAdd e e') = do
@@ -380,13 +315,6 @@ runCM m st = runIdentity $ runErrorT $ runStateT m st
 
 runCheck :: Exp -> Either String (Type, CheckState)
 runCheck e = runCM (findTypeCleanConstraints emptyEnv e) initState 
-
-checkProg :: Program -> Bool
-checkProg defs = isRight $ runCheck (ELets defs ENew) -- ENew could be anything
-
-isRight :: Either a b -> Bool
-isRight (Right _) = True
-isRight (Left  _) = False
 
 -- ** Fresh variables (… in wp)
 

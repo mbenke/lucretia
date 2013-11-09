@@ -46,15 +46,9 @@ pDef = (try pFullDef) <|> ((\e -> ("_",e)) <$> pExp)
 pFullDef = liftA2 (,)  (identifier <* symbol "=")  pExp
 
 pExp, pTerm, pF :: Parser Exp
-pExp = pFunc <|> pIf <|> pNew <|> pLet <|> pArith <|> pBreak
+pExp = pFunc <|> pIf <|> pNew <|> pLet <|> pArith
 
-mkFuncExp :: [Param] -> Exp -> Exp
-mkFuncExp as b = EFunc $ Func as TInt b --TODO
--- mkFuncExp = ((.).(.)) EFunc Func
--- or:         fmap fmap fmap EFunc Func
-
-
-pFunc = mkFuncExp <$> (kw "func" *> parens pParams) <*> pExp
+pFunc = EFunDecl <$> (kw "func" *> parens pParams) <*> pExp
 
 pParams = pParam `sepBy` (symbol ",")
 pParam = identifier
@@ -62,13 +56,13 @@ pParam = identifier
 pMaybeCall f = do
   pCall f <|> return f
 
-pCall f = ECall f <$> parens (pExp `sepBy` (symbol ","))
+pCall f = EFunCall f <$> parens (pExp `sepBy` (symbol ","))
 
 -- Applicative version
 pMaybeCallA :: Parser(Exp->Exp)
 pMaybeCallA = pCallA <|> pure id
 pCallA :: Parser(Exp->Exp)
-pCallA = flip ECall <$> parens (pExp `sepBy` (symbol ","))
+pCallA = flip EFunCall <$> parens (pExp `sepBy` (symbol ","))
 
 pIf = EIf <$> (kw "if" *> pExp) 
           <*> (kw "then" *> pExp) 
@@ -114,8 +108,7 @@ pIdExp = (flip ($)) <$> identifier <*> pIdExp'
 
 pIdExp' :: Parser (Name -> Exp)
 pIdExp' = pDotted 
-          <|> (symbol ":" *> pLabel)
-          <|> fmap (.EVar) pMaybeCallA 
+          <|> fmap (.EVar) pMaybeCallA
           
 antiEVar :: Parser (Exp->Exp) -> Parser (Name->Exp)          
 antiEVar = fmap (.EVar) 
@@ -126,15 +119,3 @@ pIdExp'' :: Parser (Name -> Name -> Exp)
 pIdExp'' = (\e x1 x2 -> ESet x1 x2 e) <$>(symbol "=" *>  pExp)
                 <|> pure EGet 
 
-pBreak :: Parser Exp
-pBreak = do
-  kw "break" 
-  n <- identifier
-  e <- pExp
-  return $ EBreak n e
-  
-
--- FIXME: replace TAny wityh actual type
--- pLabel n = pExp >>= return $ ELabel TAny n
-pLabel :: Parser (Name -> Exp)
-pLabel =  (\e n -> ELabel n TAny e)  <$> pExp

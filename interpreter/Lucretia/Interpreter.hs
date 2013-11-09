@@ -67,7 +67,7 @@ printState state = do
 -- * Values
 
 data Val = VInt Integer | VLoc Loc | VNone | VRec Record
-         | VFun Func
+         | VFun [Name] Exp
          deriving (Eq) 
 type Record = (Map.Map Name Val)
 
@@ -90,8 +90,8 @@ getVRec :: Val -> IM Record
 getVRec (VRec r) = return r
 getVRec v = throwError $ "Not a record: "++show v
 
-getVFun :: Val -> IM Func
-getVFun (VFun f) = return f
+getVFun :: Val -> IM ([Name] Exp)
+getVFun (VFun as body) = return (as, body)
 getVFun v = throwError $ "Not a function: "++show v
 
 isTrueVal :: Val -> Bool
@@ -288,22 +288,16 @@ eval (ESet n1 n2 e) = do
   updateStore l (VRec (Map.insert n2 v r))
   return v
 eval ENone = return VNone
-eval (ELabel n t e) = eval e `catchException` handleBreak n where
-  handleBreak n (ExcBreak l v) | l == n = return v
-  handleBreak n e = throwException e
-eval (EBreak l e) = do
-  v <- eval e
-  throwException (ExcBreak l v)
-eval (EFunc f) = return (VFun f)
-eval call@(ECall (EVar "print") es) = do
+eval (EFunDecl f) = return (VFun f)
+eval call@(EFunCall (EVar "print") es) = do
   vs <- mapM eval es
   let line = (intercalate " " . map show) vs
   appendToOutput line
   appendToOutput "\n"
   return VNone
-eval call@(ECall e es) = do
+eval call@(EFunCall e es) = do
   v <- eval e
-  f@(Func as _ body) <- getVFun v
+  (as, body) <- getVFun v
   vs <- mapM eval es
   enterScope
   passParams as vs

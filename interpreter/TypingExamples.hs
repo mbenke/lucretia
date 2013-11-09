@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 
 import Lucretia.Definitions
-import Lucretia.TypeChecker.TypeChecker (runCheck,checkProg)
+import Lucretia.TypeChecker.TypeChecker (runCheck)
 import Lucretia.Syntax
 import Lucretia.Types
 import qualified Data.Map as M
@@ -12,7 +12,7 @@ test :: Exp -> String
 test e = either ("ERROR:"++) show (runCheck e)
 
 -- Example 5.2.1; works: "(X1,[X1 < {c:string}])"
-e521 = ELet "ha" EBoolTrue $
+e521 = ELet "ha" eTrue $
        ELet "m"  ENew $
        __ (eif (EVar "ha")
          [ESet "m" "c" (EStr "arg")]
@@ -20,7 +20,7 @@ e521 = ELet "ha" EBoolTrue $
        EVar "m" 
        
 -- Example 5.2.2; works: "(X1,[X1 < {c:string v undefined}])"
-e522 = ELet "ha" EBoolTrue $
+e522 = ELet "ha" eTrue $
        ELet "m"  ENew $
        __ (eif (EVar "ha")
          [ESet "m" "c" (EStr "arg")]
@@ -28,14 +28,10 @@ e522 = ELet "ha" EBoolTrue $
        EVar "m"
 
 -- Example 5.3.1; works: "([Xs < {}] Xs int -> NoneType [Xs < {a:int}],[])"
-t531 = tfunc [("Xs",emptyRecType)] [TVar "Xs",TInt] TNone 
-               [("Xs",oneFieldTRec "a" TInt)]
-e531 = efunc ["self","x"] t531 [ESet "self" "a" (EVar "x")]
+e531 = efunc ["self","x"] [ESet "self" "a" (EVar "x")]
 
-e531b = ECall f [new, 42] where
-  f =efunc ["self","x"] t (__ (ESet "self" "a" (EVar "x")) $ EVar "self")
-  t = tfunc [("Xs",emptyRecType)] [TVar "Xs",TInt] (TVar "Xs") 
-               [("Xs",oneFieldTRec "a" TInt)]
+e531b = EFunCall f [new, 42] where
+  f = efunc ["self","x"] (__ (ESet "self" "a" (EVar "x")) $ EVar "self")
 -- Example 5.4.2; works: "(X1,[X1 < {self:X1}])"
 e542 = 
   ELet "o" new $
@@ -44,20 +40,13 @@ e542 =
   EGet "s" "self"
 
 -- Example 5.4.3; works: (X1,[X1 < {equals:[Xa < {w:int},Y < {r:int}];a:Xa, eq:[];;int int -> bool [];Y -> bool [], w:int}])
-te543 = ([TVar "Y"],[("a",TVar "Xa"),("eq",teq)],[("Xa",oneFieldTRec "w" TInt),("Y",oneFieldTRec "r" TInt)]) 
-     ==> (TBool,[])  where
-    teq = (([TInt,TInt],[],[]) ==> (TBool,[]))  
-
-
-e543 = 
-  ELet "eq" ( efunc ["a","b"] teq True) $
+e543 =
+  ELet "eq" (efunc ["a","b"] True) $
   ELet "a" ENew $ 
   ELet "_" (ESet "a" "w" 0) $
   ESet "a" "equals" $ 
-     efunc ["y"] te543 
-       (ECall (EVar "eq") [EGet "a" "w",EGet "y" "r"]) 
-  where
-    teq = (([TInt,TInt],[],[]) ==> (TBool,[]))  
+     efunc ["y"] $
+       EFunCall (EVar "eq") [EGet "a" "w",EGet "y" "r"])
 
 
 -- Example 5.4.1; simplified; works
@@ -67,7 +56,7 @@ e541d =
   ELet "o" new $
   ELet "_" (ESet "o" "class" (EVar "C")) $
   ELet "f" (EGet "C" "init") $
-  __ (ECall (EVar "f") [EVar "o",42]) $
+  __ (EFunCall (EVar "f") [EVar "o",42]) $
   EGet "o" "a"
   
 -- here is what we want in the end; should be int
@@ -78,7 +67,7 @@ e541 =
   ELet "_" (ESet "o" "class" (EVar "C")) $
   ELet "c" (EGet "o" "class") $
   ELet "f" (EGet "c" "init") $
-  __ (ECall (EVar "f") [EVar "o",42]) $
+  __ (EFunCall (EVar "f") [EVar "o",42]) $
   -- EGet "o" "class"
   EVar "o"
 {-
@@ -87,14 +76,12 @@ d541a = do
   -- de $ ESet "m" "C" new
   c <- dlet "C" new
   
-  let tinit = tfunc  [("Xs",emptyRecType)] [TVar "Xs",TInt]
-                 TNone [("Xs",oneFieldTRec "a" TInt)]
-  let init = efunc ["self","x"] tinit [ESet "self" "a" (EVar "x")]
+  let init = efunc ["self","x"] [ESet "self" "a" (EVar "x")]
   dset "C" "init" init
   o <- dlet "o" new
   dset "o" "class" c
   f <- dlet "f" (EGet "C" "init")
-  de $ ECall f [o,42]
+  de $ EFunCall f [o,42]
   dget "o" "a"
  -}
 
@@ -103,14 +90,14 @@ d541a = do
 e541b = 
   ELet "o" new $
   ELet "_" (ESet "o" "foo" 13) $
-  ECall e531 [EVar "o", 42]
+  EFunCall e531 [EVar "o", 42]
 
 e541c = 
   ELet "o" new $
   ELet "_" (ESet "o" "foo" 13) $
   ELet "_" (ESet "o" "init" e531) $
   ELet "f" (EGet "o" "init") $
-  ECall (EVar "f") [EVar "o",42]
+  EFunCall (EVar "f") [EVar "o",42]
 
 
 e541e = 
@@ -119,7 +106,7 @@ e541e =
   ELet "o" new $
   ELet "_" (ESet "o" "class" (EVar "C")) $
   ELet "f" (EGet "C" "init") $
-  ECall (EVar "f") [EVar "o",42]
+  EFunCall (EVar "f") [EVar "o",42]
 
 -- Example 5.4.4
 {-
@@ -155,56 +142,27 @@ let f = ifhasattr(o,m) then o.m() else o.class.m(o)
 
 -- Example 5.4.4; works: "(int,[])"
 e544 =  let {
-    tm = tfunc [("Xs",emptyRecType)] [TVar "Xs"] TInt [] ;
-    tm7 = tfunc [] [] TInt [] } in
   ELet "C" new $
-  __ (ESet "C" "m" $ efunc ["self"] tm (EInt 13)) $
-  ELet "m7"  (efunc [] tm7 (EInt 13)) $
+  __ (ESet "C" "m" $ efunc ["self"] (EInt 13)) $
+  ELet "m7"  (efunc [] (EInt 13)) $
   ELet "o" new $
   __ (ESet "o" "m" (EVar "m7")) $
   EIfHasAttr "o" "m" 
-    (ELet "f" (EGet "o" "m") (ECall (EVar "f") []))
-    (ELet "f" (EGet "C" "m") (ECall (EVar "f") [EVar "o"]))
+    (ELet "f" (EGet "o" "m") (EFunCall (EVar "f") []))
+    (ELet "f" (EGet "C" "m") (EFunCall (EVar "f") [EVar "o"]))
 
 -- Example 5.4.5;
-te545 = tfunc2 conm env [TInt] TInt conm where
-            conm = [("Xm", M.fromList [("f",te545),("eq",teq)])]
-            env = [("m",TVar"Xm")]              
-            
-teq = (([TInt,TInt],[],[]) ==> (TBool,[]))  
-tmul = (([TInt,TInt],[],[]) ==> (TBool,[]))  
 e545 = undefined
 
-te545b = tfunc2 conm env [TInt] TInt conm where
-   conm = [("Xm", M.fromList [("f",tf)])]
-   env = [("m",TVar"Xm")] 
-   tf = tfunc [] [TInt] TInt []
-e545b = efunc ["n"] te545b $ ELet "f" (EGet "m" "f") b 
-        where b = ECall (EVar "f") [EVar "n"]
--- Example 5.5.1; works: "([];; -> int [],[])"
-e551 = efunc [] typ body where
-  typ = tfunc [] [] TInt []
-  ltyp = typ
-  body = ELabel "return" ltyp $
-    EBreak "return" 7
-
--- Example 5.5.1b; works, expected error: label type not a TFunc
-e551b = efunc [] typ body where
-  typ = tfunc [] [] TInt []
-  ltyp = TInt
-  body = ELabel "return" ltyp $
-    EBreak "return" 7
+e545b = efunc ["n"] $ ELet "f" (EGet "m" "f") b
+        where b = EFunCall (EVar "f") [EVar "n"]
 
 -- Auxiliary
 
 new = ENew
 
-tfunc before params result after = tfunc2 before [] params result after 
-tfunc2 before env params result after =
-  TFunc (M.fromList before) (M.fromList env) params result (M.fromList after)
-(p,e,b) ==> (r,a) = tfunc2 b e p r a
 
-efunc args typ body = EFunc $ Func args typ (toExp body)
+efunc args body = EFunDecl args $ toExp body
 
 __ :: Exp -> Exp -> Exp
 __ e = ELet "_" e
@@ -224,9 +182,8 @@ instance ToExp Exp where
   toExp = id
 
 instance ToExp Bool where
-  toExp True = EBoolTrue
-  toExp False = EBoolFalse
-  
+  toExp = EBool
+
 instance ToExp Integer where
   toExp = EInt
     

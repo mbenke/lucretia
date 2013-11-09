@@ -76,7 +76,7 @@ byValueTestsData = [
   (text2, VInt 1),
   (text4, VNone),
   (text7, VInt 1),
-  (text8, VFun $ Func ["x"] TInt $ EVar "x"),
+  (text8, VFun ["x"] $ EVar "x"),
   (text9, VInt 42),
   (text12, VNone)
   ]
@@ -169,7 +169,7 @@ prog2 = [
   ]
 prog3 = [ 
   ("y", 
-   (ELet "x" (EInt 42) (EVar "x"))),
+   (ELet "x" eInt42 (EVar "x"))),
   ("_",derefVar "y") ]
 -- undefined var
 bad1 = [("_", EVar "x")]
@@ -192,28 +192,20 @@ text4 = "locals = new {}; \
 expr :: Exp -> Defs
 expr e = [("_",e)]
 
--- expect 2
-prog5 = expr $ ELabel "return" (ELet "x" ( 1) 2)
--- expect exception "foo"
-prog6 = expr $ ELabel "return" (ELet "x" (EBreak"foo" 1) 2)
--- expect 1
-prog7 = expr $ ELabel "return" (ELet "x" (EBreak"return" 1) 2)
-text7 = "return: let x=break return 1 in 2"
-
-func1 = EFunc (Func ["x"] TInt (EVar "x"))
+func1 = EFunDecl ["x"] TInt $ EVar "x"
 -- expect id
 prog8 = expr func1
 text8 = "func(x) x"
 -- expect 42
-prog9 = expr $ ECall func1 [EInt 42]
+prog9 = expr $ EFunCall func1 [eInt42]
 text9 = "i=func(x)x;i(42)"
 --text9 = "(func(x)x)(42)"
 
 -- expect error
-prog10 = expr $ ECall func1 [EInt 42,EInt 1]
+prog10 = expr $ EFunCall func1 [eInt42,EInt 1]
 text10 = "i=func(x)x;i(42,1)"
 -- expect error
-prog11 = expr $ ECall func1 []
+prog11 = expr $ EFunCall func1 []
 text11 = "i=func(x)x;i()"
 
 -- expect 4242

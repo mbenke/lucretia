@@ -22,7 +22,7 @@ tests = outputTypeTests
 type OutputTestDatum = ((String, Exp), String)
 outputTypeTestsData :: [OutputTestDatum]
 outputTypeTestsData = [
-  (VARIABLE_NAME(eInt), "Right (int,[])"),
+  (VARIABLE_NAME(eInt42), "Right (int,[])"),
   (VARIABLE_NAME(ENew), "Right (X1,[X1 < {}])"),
   (VARIABLE_NAME(eLet), "Right (X1,[X1 < {}])"),
   -- Record update (update-old)
@@ -63,14 +63,6 @@ outputTypeTestsData = [
   (VARIABLE_NAME(eLetReturningCyclicNestedRecord), "Right (X3,[X1 < {a:X3}, X3 < {c:X1}])"),
   (VARIABLE_NAME(eFuncReturningCyclicNestedRecord), "Right ([];;bool int -> X3 [X1 < {a:X3}, X3 < {c:X1}],[])"),
   (VARIABLE_NAME(eCallLet), "Right (X1,[X1 < {a:int}])"),
-  (VARIABLE_NAME(eBreak), "Left \"Label L1 was not declared.\""),
-  (VARIABLE_NAME(eLabelBreak), "Right (bool,[])"),
-  (VARIABLE_NAME(eLabelBreak_preservingConstraintsDespiteApplyingSignature), "Right (X,[X < {a:int v bool}])"),
-  --"Shows why $\\Psi_1$ is needed in $\\Psi_2 \\vdc \\mathfrak{f}(\\Psi'_2)$"
-  (VARIABLE_NAME(eGetN), "Right (int,[])"),
-  (VARIABLE_NAME(eGetN_nested), "Right (int,[])"),
-  (VARIABLE_NAME(eSetN_nested), "Right (int,[])"),
-  (VARIABLE_NAME(eGetN_wrong), "Left \"Unknown variable x3.\""),
   (VARIABLE_NAME(eAdd), "Right (int,[])"),
   (VARIABLE_NAME(eAdd_wrong), "Left \"TypeError: unsupported operand type(s) for +: int and NoneType\"")
   ]
@@ -84,16 +76,14 @@ outputTypeTests = map (uncurry mapToATest) outputTypeTestsData
     expectedType
     (show $ runCheck e)
 
-tfunc before params result after = TFunc before Map.empty params result after 
+eInt42 :: Exp
+eInt42 = EInt 42
 
-eInt :: Exp
-eInt = EInt 42
+eTrue :: Exp
+eTrue = EBool True
 
-eBoolTrue :: Exp
-eBoolTrue = EBoolTrue
-
-eBoolFalse :: Exp
-eBoolFalse = EBoolFalse
+eFalse :: Exp
+eFalse = EBool False
 
 eGet_noVar :: Exp
 eGet_noVar =
@@ -101,7 +91,7 @@ eGet_noVar =
 
 eGet_varNotRec :: Exp
 eGet_varNotRec =
-  ELet "foo" EBoolTrue $
+  ELet "foo" eTrue $
   EGet "foo" "a"
 
 eGet_wrongField :: Exp
@@ -112,7 +102,7 @@ eGet_wrongField =
 eSetGet :: Exp
 eSetGet =
   ELet "foo" ENew $
-  ELet "_" (ESet "foo" "a" $ EInt 42) $
+  ELet "_" (ESet "foo" "a" eInt42) $
   EGet "foo" "a"
 
 eLet :: Exp
@@ -121,23 +111,23 @@ eLet = ELet "foo" ENew (EVar "foo")
 eRecordWithOneField :: Exp
 eRecordWithOneField = 
   ELet "foo" ENew $
-  (ESet "foo" "a" $ EInt 42)
+  ESet "foo" "a" eInt42
 
 eRecordWithManyFields :: Exp
 eRecordWithManyFields = 
   ELet "foo" ENew $
-  ELet "_" (ESet "foo" "a" $ EInt 42) $
-  ELet "_" (ESet "foo" "b" $ EInt 42) $
-  ELet "_" (ESet "foo" "c" $ EInt 42) $
+  ELet "_" (ESet "foo" "a" eInt42) $
+  ELet "_" (ESet "foo" "b" eInt42) $
+  ELet "_" (ESet "foo" "c" eInt42) $
   EVar "foo"
 
 eIfTOr :: Exp
 eIfTOr = 
   ELet "foo" ENew $
   ELet "_"
-  (EIf (EBoolTrue)
-    (ESet "foo" "a" $ EInt 42)
-    (ESet "foo" "a" $ EBoolTrue)
+  (EIf eTrue
+    (ESet "foo" "a" eInt42)
+    (ESet "foo" "a" $ eTrue)
   ) $
   EVar "foo"
 
@@ -145,9 +135,9 @@ eIfTFieldUndefined :: Exp
 eIfTFieldUndefined = 
   ELet "foo" ENew $
   ELet "_"
-  (EIf (EBoolTrue)
-    (ESet "foo" "a" $ EInt 42)
-    (ESet "foo" "b" $ EBoolTrue)
+  (EIf eTrue
+    (ESet "foo" "a" eInt42)
+    (ESet "foo" "b" $ eTrue)
   ) $
   EVar "foo"
 
@@ -155,9 +145,9 @@ eIfHasAttr :: Exp
 eIfHasAttr =
   ELet "foo" ENew $
   ELet "_"
-  (EIf (EBoolTrue)
-    (ESet "foo" "a" $ EInt 42)
-    (ESet "foo" "b" $ EBoolTrue)
+  (EIf eTrue
+    (ESet "foo" "a" eInt42)
+    (ESet "foo" "b" $ eTrue)
   ) $
   EIfHasAttr "foo" "a"
     (EGet "foo" "a")
@@ -167,9 +157,9 @@ eIfHasAttr_noSuchField :: Exp
 eIfHasAttr_noSuchField =
   ELet "foo" ENew $
   ELet "_"
-  (EIf (EBoolTrue)
-    (ESet "foo" "a" $ EInt 42)
-    (ESet "foo" "b" $ EBoolTrue)
+  (EIf eTrue
+    (ESet "foo" "a" eInt42)
+    (ESet "foo" "b" $ eTrue)
   ) $
   EIfHasAttr "foo" "c"
     (EInt 6)
@@ -177,60 +167,47 @@ eIfHasAttr_noSuchField =
 
 eFunc :: Exp
 eFunc =
-  EFunc (Func 
+  EFunDecl
     ["x1", "x2"]
-    (tfunc (Map.fromList []) [TBool, TInt] TBool (Map.fromList []))
     (EVar "x1")
-  )
 
 eFuncWrongReturnType :: Exp
 eFuncWrongReturnType =
-  EFunc (Func 
+  EFunDecl
     ["x1", "x2"]
-    (tfunc (Map.fromList []) [TBool, TInt] TInt (Map.fromList []))
     (EVar "x1")
-  )
 
 eFuncWithConstraints :: Exp
 eFuncWithConstraints =
-  EFunc (Func 
+  EFunDecl
     ["x1", "x2"]
-    (tfunc (Map.fromList []) [TBool, TInt] (TVar "X1") (Map.fromList [("X1", oneFieldTRec "a" TInt)]))
     eRecordWithOneField
-  )
 
 eCall_eFuncWithWeakConstraints :: Exp
 eCall_eFuncWithWeakConstraints =
-  ELet "f" (EFunc (Func 
+  ELet "f" (EFunDecl
     ["x1"]
-    (tfunc (Map.fromList []) [TOr $ Set.fromList [TBool, TInt]] (TVar "X1") (Map.fromList [("X1", oneFieldTRec "a" TInt)]))
     eRecordWithOneField
-  )) $
-  ECall (EVar "f") [EBoolTrue]
+  ) $
+  EFunCall (EVar "f") [eTrue]
 
 eFuncReturningRecordWithMoreFieldsThanRequiredByConstraintsInFunctionSignature :: Exp
 eFuncReturningRecordWithMoreFieldsThanRequiredByConstraintsInFunctionSignature =
-  EFunc (Func 
+  EFunDecl
     ["x1", "x2"]
-    (tfunc (Map.fromList []) [TBool, TInt] (TVar "X1") (Map.fromList [("X1", oneFieldTRec "a" TInt)]))
     eRecordWithManyFields
-  )
 
 eFuncWrongNumberOfArguments :: Exp
 eFuncWrongNumberOfArguments =
-  EFunc (Func 
+  EFunDecl
     ["x1", "x2"]
-    (tfunc (Map.fromList []) [TBool] TBool (Map.fromList [("X1", oneFieldTRec "a" TInt)]))
     eRecordWithOneField
-  )
 
 eFuncDefiningNestedRecordInsideAndReturningIt :: Exp
 eFuncDefiningNestedRecordInsideAndReturningIt =
-  EFunc (Func 
+  EFunDecl
     ["x1", "x2"]
-    (tfunc (Map.empty) [TBool, TInt] (TVar "X3") (Map.fromList [("X1", oneFieldTRec "a" TInt), ("X3", oneFieldTRec "c" (TVar "X1"))])) $
     eLetDefiningNestedRecordInsideAndReturningIt
-  )
 
 eLetReturningCyclicNestedRecord :: Exp
 eLetReturningCyclicNestedRecord =
@@ -244,17 +221,15 @@ eLetReturningCyclicNestedRecord =
 
 eFuncReturningCyclicNestedRecord :: Exp
 eFuncReturningCyclicNestedRecord =
-  EFunc (Func 
+  EFunDecl
     ["x1", "x2"]
-    (tfunc (Map.empty) [TBool, TInt] (TVar "X3") (Map.fromList [("X1", oneFieldTRec "a" (TVar "X3")), ("X3", oneFieldTRec "c" (TVar "X1"))])) $
     eLetReturningCyclicNestedRecord
-  )
 
 
 eLetDefiningNestedRecordInsideAndReturningIt :: Exp
 eLetDefiningNestedRecordInsideAndReturningIt =
   ELet "x" ENew $
-  ELet "_" (ESet "x" "a" $ EInt 42) $
+  ELet "_" (ESet "x" "a" eInt42) $
   ELet "y" ENew $
   ELet "_" (ESet "y" "b" $ EInt 7) $
   ELet "z" ENew $
@@ -263,73 +238,57 @@ eLetDefiningNestedRecordInsideAndReturningIt =
 
 eFuncDefiningNestedRecordInsideAndReturningItHavingDifferentlyNamedConstraintVariables :: Exp
 eFuncDefiningNestedRecordInsideAndReturningItHavingDifferentlyNamedConstraintVariables =
-  EFunc (Func 
+  EFunDecl
     ["x1", "x2"]
-    (tfunc (Map.empty) [TBool, TInt] (TVar "C") (Map.fromList [("A", oneFieldTRec "a" TInt), ("C", oneFieldTRec "c" (TVar "A"))])) $
     eLetDefiningNestedRecordInsideAndReturningIt
-  )
 
 eFuncDefiningNestedRecordInsideAndHavingMismatchingConstraintSignature1 :: Exp
 eFuncDefiningNestedRecordInsideAndHavingMismatchingConstraintSignature1 =
-  EFunc (Func 
+  EFunDecl
     ["x1", "x2"]
-    (tfunc (Map.empty) [TBool, TInt] (TVar "C") (Map.fromList [("C", oneFieldTRec "c" TInt)])) $
     eLetDefiningNestedRecordInsideAndReturningIt
-  )
 
 eFuncWithUnnecessaryConstraints :: Exp
 eFuncWithUnnecessaryConstraints =
-  EFunc (Func 
+  EFunDecl
     ["x1", "x2"]
-    (tfunc (Map.fromList []) [TBool, TInt] (TVar "X1") (Map.fromList [("X1", oneFieldTRec "a" TInt), ("X2", oneFieldTRec "b" TBool)]))
     eRecordWithOneField
-  )
 
 eFuncWithDanglingTypeVariableInSignature :: Exp
 eFuncWithDanglingTypeVariableInSignature =
-  EFunc (Func 
+  EFunDecl
     ["x1", "x2"]
-    (tfunc (Map.empty) [TBool, TInt] (TVar "C") (Map.fromList [("A", oneFieldTRec "a" TInt)])) $
     eLetDefiningNestedRecordInsideAndReturningIt
-  )
 
 eFuncDefiningRecordInsideButNotReturningIt :: Exp
 eFuncDefiningRecordInsideButNotReturningIt =
-  EFunc (Func 
+  EFunDecl
     ["x1", "x2"]
-    (tfunc (Map.empty) [TBool, TInt] TBool (Map.empty)) $
     eLetDefiningRecordInsideButNotReturningIt
-  )
 
 eLetDefiningRecordInsideButNotReturningIt :: Exp
 eLetDefiningRecordInsideButNotReturningIt =
-  ELet "_" eRecordWithOneField (EBoolTrue)
+  ELet "_" eRecordWithOneField $ eTrue
 
 eCall :: Exp
 eCall =
-  ECall eFuncWithConstraints [EBoolTrue, (EInt 42)]
+  EFunCall eFuncWithConstraints [eTrue, eInt42]
 
 eCallLet :: Exp
 eCallLet =
   ELet "fun" eFuncWithConstraints $
-    ECall (EVar "fun") [EBoolTrue, (EInt 42)]
+    EFunCall (EVar "fun") [eTrue, eInt42]
 
 eFuncTOr :: Exp
 eFuncTOr =
-  EFunc $ Func
+  EFunDecl
     []
-    (tfunc emptyConstraints [] (TVar "X")
-      (Map.fromList [("X", oneFieldTRec "a" (TOr $ Set.fromList [TBool, TInt]))])
-    ) $
     eIfTOr
 
 eFuncTOr_withGarbageConstraint :: Exp
 eFuncTOr_withGarbageConstraint =
-  EFunc $ Func
-    []
-    (tfunc emptyConstraints [] (TVar "X")
-      (Map.fromList [("X", oneFieldTRec "a" TInt)])
-    ) $
+  EFunDecl
+    [] $
     ELet "x" ENew $
     ELet "y" ENew $
     ELet "_" (ESet "x" "a" $ EInt 7) $
@@ -338,86 +297,21 @@ eFuncTOr_withGarbageConstraint =
 
 eFuncTOr_postCondition_expectedWeakerThanActual :: Exp
 eFuncTOr_postCondition_expectedWeakerThanActual =
-  EFunc $ Func
+  EFunDecl
     []
-    (tfunc emptyConstraints [] (TVar "X")
-      (Map.fromList [("X", oneFieldTRec "a" (TOr $ Set.fromList [TBool, TInt]))])
-    ) $
     eRecordWithOneField
 
 eFuncTOr_postCondition_expectedWeakerThanActual_moreRecords :: Exp
 eFuncTOr_postCondition_expectedWeakerThanActual_moreRecords =
-  EFunc $ Func
+  EFunDecl
     []
-    (tfunc emptyConstraints [] (TVar "X")
-      (Map.fromList [("X", oneFieldTRec "a" (TOr $ Set.fromList [TBool, TInt]))])
-    ) $
     eRecordWithManyFields
 
 eFuncTOr_postCondition_expectedStrongerThanActual :: Exp
 eFuncTOr_postCondition_expectedStrongerThanActual =
-  EFunc $ Func
+  EFunDecl
     []
-    (tfunc emptyConstraints [] (TVar "X")
-      (Map.fromList [("X", oneFieldTRec "a" (TOr $ Set.fromList [TInt]))])
-    ) $
     eIfTOr
-
-eBreak :: Exp
-eBreak =
-  EBreak "L1" $
-    EBoolTrue
-
-eLabelBreak :: Exp
-eLabelBreak =
-  ELabel "L1"
-    (tfunc emptyConstraints [] TBool emptyConstraints) $
-    EBreak "L1" $
-      EBoolTrue
-
-eLabelBreak_preservingConstraintsDespiteApplyingSignature :: Exp
-eLabelBreak_preservingConstraintsDespiteApplyingSignature =
-  ELet "x" ENew $
-  ELet "_" (ESet "x" "a" $ EInt 7) $
-  ELabel "L1"
-    (tfunc emptyConstraints [] (TVar "X")
-      (Map.fromList [("X", oneFieldTRec "a" (TOr $ Set.fromList [TBool, TInt]))])
-    ) $
-    ELet "y" ENew $
-    ELet "_" (ESet "y" "b" $ EInt 8) $
-    EIf EBoolTrue
-      (EBreak "L1" $
-        ELet "_" (ESet "y" "b" $ EBoolTrue) $
-	  EVar "y"
-      )
-      (EVar "y")
-
-eGetN :: Exp
-eGetN =
-  ELet "foo" ENew $
-  ELet "_" (ESet "foo" "a" $ EInt 42) $
-  EGetN ["foo", "a"]
-
-eGetN_nested :: Exp
-eGetN_nested =
-  ELet "x1" ENew $
-  ELet "t2" ENew $
-  ELet "_" (ESet "t2" "x3" $ EInt 42) $
-  ELet "_" (ESet "x1" "x2" $ EVar "t2") $
-  EGetN ["x1", "x2", "x3"]
-
-eSetN_nested :: Exp
-eSetN_nested =
-  ELet "x1" ENew $
-  ELet "_" (ESetN ["x1", "x2"] ENew) $
-  ELet "_" (ESetN ["x1", "x2", "x3"] $ EInt 42) $
-  EGetN ["x1", "x2", "x3"]
-
-eGetN_wrong :: Exp
-eGetN_wrong =
-  ELet "x1" ENew $
-  ELet "_" (ESetN ["x1", "x2"] ENew) $
-  EGetN ["x1", "x2", "x3"]
 
 eAdd :: Exp
 eAdd =

@@ -53,7 +53,7 @@ pFunc = do
   params <- pParams
   symbol ")"
   body <- pExp
-  return (EFunc(Func params body))
+  return (EFunDecl params body))
 
 pParams = pParam `sepBy` (symbol ",")
 pParam = identifier
@@ -65,7 +65,7 @@ pCall f = do
   symbol "("
   es <- pActParams 
   symbol ")"
-  return $ ECall f es
+  return $ EFunCall f es
 pActParams = pExp `sepBy` (symbol ",")
 
 pIf = do
@@ -113,14 +113,3 @@ pIdExp' n = (symbol "." >> identifier >>= pIdExp'' n )
 pIdExp'' n n2 = (symbol "=" >> (ESet n n2 <$> pExp))
                 <|> (return $ EGet n n2)
                 
-pBreak :: Parser Exp
-pBreak = do
-  kw "break" 
-  n <- identifier
-  e <- pExp
-  return $ EBreak n e
-  
--- FIXME: replace TAny wityh actual type
-pLabel :: Name -> Parser Exp
-pLabel n = pExp >>= return $ ELabel TAny n
-

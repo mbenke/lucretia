@@ -63,19 +63,19 @@ concatTwoExps = ELet "_"
 -- To get a list of global variables in python put @dir()@ in an empty
 -- python source file -- all are listed here below.
 preludeStmts :: [Exp]
-preludeStmts = 
-  [ ESetN [sMain, "__builtins__"] ENew -- TODO fill with python built-in functions, classes, etc
-  , ESetN [sMain, "__doc__"] eStr
-  , ESetN [sMain, "__file__"] eStr
-  , ESetN [sMain, "__name__"] eStr
-  , ESetN [sMain, "__package__"] ENew -- TODO what object it should be
-  ]
+preludeStmts = []
+--  [ ESetN [sMain, "__builtins__"] ENew -- TODO fill with python built-in functions, classes, etc
+--  , ESetN [sMain, "__doc__"] eStr
+--  , ESetN [sMain, "__file__"] eStr
+--  , ESetN [sMain, "__name__"] eStr
+--  , ESetN [sMain, "__package__"] ENew -- TODO what object it should be
+--  ]
 
 eStr :: Exp
 eStr = EStr "whatever"
 
 notImplementedYet :: Exp
-notImplementedYet = ECall (EVar "print") [EStr "Not implemented yet"]
+notImplementedYet = EFunCall (EVar "print") [EStr "Not implemented yet"]
 
 cIdent :: Ident a -> String
 cIdent name@(Ident {}) = ident_string name
@@ -270,14 +270,11 @@ instance Convertable (CompIter a) where
 instance Convertable (Expr a) where
   c (Var { var_ident = i }) = EVar $ cIdent i
   c (Int { int_value = i }) = EInt i
-  c (Bool { bool_value = b}) =
-    case b of
-      True  -> EBoolTrue
-      False -> EBoolFalse
+  c (Bool { bool_value = b}) = EBool b
   c None {} = ENone
   c (Call { call_fun = Var { var_ident = Ident { ident_string = "print" } }, call_args = args }) =
     concatExps $ map c args -- TODO model print as a variable arguments count function
-  c (Call { call_fun = f, call_args = args }) = ECall (c f) (map c args)
+  c (Call { call_fun = f, call_args = args }) = EFunCall (c f) (map c args)
   c (BinaryOp { operator = op, left_op_arg = left, right_op_arg = right }) =
     case op of
       Plus _     -> EAdd (c left) (c right)

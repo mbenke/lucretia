@@ -29,13 +29,7 @@ data Type
   | TOr (Set Type) -- ^ @t_b,1 v t_b,2@ in wp
   | TFieldUndefined -- ^ @_|_@ in wp
   | TFunc Constraints Env [Type] Type Constraints -- ^ @[t1, …, tn; Psi_1] => [tn+1; \Psi_2]@ in wp
-  | TAny
   deriving (Eq, Ord)
-
-eqOrAny :: Type -> Type -> Bool
-eqOrAny TAny _ = True
-eqOrAny _ TAny = True
-eqOrAny t t' = t == t'
 
 -- * Record Type (@t_r = {l : t} | {}@ in wp)
 
@@ -133,5 +127,4 @@ instance Show Type where
             intercalate " " (map show paramTypes), " -> ", 
             show bodyType, " ", showConstraints constraintsAfter
            ]
-  show TAny = "any-type"
 

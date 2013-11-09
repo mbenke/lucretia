@@ -101,7 +101,7 @@ instance MonomorphicModuloNames Type where
       err = notMonomorphic $ "type mismatch:\n  " ++ show ts ++ "\n  " ++ show ts'
   w (TOr s) t = w (TOr s) (TOr $ Set.singleton t)
   w t (TOr s) = w (TOr $ Set.singleton t) (TOr s)
-  w a a' = unless (a `eqOrAny` a') $ notMonomorphic $ "type " ++ show a' ++ " does not equal " ++ show a ++ "."
+  w a a' = unless (a == a') $ notMonomorphic $ "type " ++ show a' ++ " does not equal " ++ show a ++ "."
 
 instance MonomorphicModuloNames TVar where
   w n n' = do
