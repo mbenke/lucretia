@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE TemplateHaskell #-}
 --module Lucretia.TypeChecker.Test(tests, main) where
 module Lucretia.TypeChecker.Test where
 
@@ -9,12 +9,12 @@ import qualified Data.Set as Set
 
 import HUnitUtils (assertEqualShowingDiff)
 
+import Utils.VariableName (variableNameAndValue)
+
 import Lucretia.Definitions
 import Lucretia.TypeChecker.TypeChecker (runCheck)
 import Lucretia.Syntax
 import Lucretia.Types
-
-#define VARIABLE_NAME(variable) ("variable", variable)
 
 tests :: [Test]
 tests = outputTypeTests
@@ -22,49 +22,49 @@ tests = outputTypeTests
 type OutputTestDatum = ((String, Exp), String)
 outputTypeTestsData :: [OutputTestDatum]
 outputTypeTestsData = [
-  (VARIABLE_NAME(eInt42), "Right (int,[])"),
-  (VARIABLE_NAME(ENew), "Right (X1,[X1 < {}])"),
-  (VARIABLE_NAME(eLet), "Right (X1,[X1 < {}])"),
+  ($(variableNameAndValue 'eInt42), "Right (int,[])"),
+  ($(variableNameAndValue 'eNew), "Right (X1,[X1 < {}])"),
+  ($(variableNameAndValue 'eLet), "Right (X1,[X1 < {}])"),
   -- Record update (update-old)
-  (VARIABLE_NAME(eSetGet), "Right (int,[])"),
+  ($(variableNameAndValue 'eSetGet), "Right (int,[])"),
   -- Record access (access)
-  (VARIABLE_NAME(eGet_noVar), "Left \"Unknown variable foo.\""),
-  (VARIABLE_NAME(eGet_varNotRec), "Left \"Variable type mismatch: expected record type, but got bool.\""),
-  (VARIABLE_NAME(eGet_wrongField), "Left \"Record {} does not contain field a\""),
+  ($(variableNameAndValue 'eGet_noVar), "Left \"Unknown variable foo.\""),
+  ($(variableNameAndValue 'eGet_varNotRec), "Left \"Variable type mismatch: expected record type, but got bool.\""),
+  ($(variableNameAndValue 'eGet_wrongField), "Left \"Record {} does not contain field a\""),
 
-  (VARIABLE_NAME(eRecordWithOneField), "Right (X1,[X1 < {a:int}])"),
-  (VARIABLE_NAME(eRecordWithManyFields), "Right (X1,[X1 < {a:int, b:int, c:int}])"),
-  (VARIABLE_NAME(eIfTOr), "Right (X1,[X1 < {a:int v bool}])"),
-  (VARIABLE_NAME(eIfTFieldUndefined), "Right (X1,[X1 < {a:int v undefined, b:bool v undefined}])"),
-  (VARIABLE_NAME(eIfHasAttr), "Right (int,[])"),
-  (VARIABLE_NAME(eIfHasAttr_noSuchField), "Left \"Record {a:int v undefined, b:bool v undefined} does not contain field c\""),
-  (VARIABLE_NAME(eFunc), "Right ([];;bool int -> bool [],[])"),
-  (VARIABLE_NAME(eFuncWrongReturnType), "Left \"Expected condition (type: int; with constraints: []) should be weaker or equal to actual condition (type: bool; with constraints: []). They are not because: type bool does not equal int.\""),
-  (VARIABLE_NAME(eFuncWithConstraints), "Right ([];;bool int -> X1 [X1 < {a:int}],[])"),
-  (VARIABLE_NAME(eFuncWrongNumberOfArguments), "Left \"Number of arguments and number of their types do not match\""),
+  ($(variableNameAndValue 'eRecordWithOneField), "Right (X1,[X1 < {a:int}])"),
+  ($(variableNameAndValue 'eRecordWithManyFields), "Right (X1,[X1 < {a:int, b:int, c:int}])"),
+  ($(variableNameAndValue 'eIfTOr), "Right (X1,[X1 < {a:int v bool}])"),
+  ($(variableNameAndValue 'eIfTFieldUndefined), "Right (X1,[X1 < {a:int v undefined, b:bool v undefined}])"),
+  ($(variableNameAndValue 'eIfHasAttr), "Right (int,[])"),
+  ($(variableNameAndValue 'eIfHasAttr_noSuchField), "Left \"Record {a:int v undefined, b:bool v undefined} does not contain field c\""),
+  ($(variableNameAndValue 'eFunc), "Right ([];;bool int -> bool [],[])"),
+  ($(variableNameAndValue 'eFuncWrongReturnType), "Left \"Expected condition (type: int; with constraints: []) should be weaker or equal to actual condition (type: bool; with constraints: []). They are not because: type bool does not equal int.\""),
+  ($(variableNameAndValue 'eFuncWithConstraints), "Right ([];;bool int -> X1 [X1 < {a:int}],[])"),
+  ($(variableNameAndValue 'eFuncWrongNumberOfArguments), "Left \"Number of arguments and number of their types do not match\""),
   --maybe this should be ok:
   --(eFuncReturningRecordWithMoreFieldsThanRequiredByConstraintsInFunctionSignature, "Right ([] bool int -> X1 [X1 < {a:int}],[])"),
-  (VARIABLE_NAME(eFuncDefiningRecordInsideButNotReturningIt), "Right ([];;bool int -> bool [],[])"),
-  (VARIABLE_NAME(eLetDefiningRecordInsideButNotReturningIt), "Right (bool,[])"),
-  (VARIABLE_NAME(eFuncDefiningNestedRecordInsideAndReturningIt), "Right ([];;bool int -> X3 [X1 < {a:int}, X3 < {c:X1}],[])"),
-  (VARIABLE_NAME(eLetDefiningNestedRecordInsideAndReturningIt), "Right (X3,[X1 < {a:int}, X3 < {c:X1}])"),
-  (VARIABLE_NAME(eFuncTOr), "Right ([];; -> X [X < {a:int v bool}],[])"),
-  (VARIABLE_NAME(eFuncTOr_withGarbageConstraint), "Right ([];; -> X [X < {a:int}],[])"),
-  (VARIABLE_NAME(eFuncTOr_postCondition_expectedWeakerThanActual), "Right ([];; -> X [X < {a:int v bool}],[])"),
-  (VARIABLE_NAME(eFuncTOr_postCondition_expectedWeakerThanActual_moreRecords), "Right ([];; -> X [X < {a:int v bool}],[])"),
-  (VARIABLE_NAME(eFuncTOr_postCondition_expectedStrongerThanActual), "Left \"Expected condition (type: X; with constraints: [X < {a:int}]) should be weaker or equal to actual condition (type: X1; with constraints: [X1 < {a:int v bool}]). They are not because: type mismatch:\\n  [int]\\n  [int,bool]\""),
-  (VARIABLE_NAME(eFuncDefiningNestedRecordInsideAndReturningItHavingDifferentlyNamedConstraintVariables), "Right ([];;bool int -> C [A < {a:int}, C < {c:A}],[])"),
-  (VARIABLE_NAME(eFuncWithUnnecessaryConstraints), "Right ([];;bool int -> X1 [X1 < {a:int}, X2 < {b:bool}],[])"),
-  (VARIABLE_NAME(eFuncDefiningNestedRecordInsideAndHavingMismatchingConstraintSignature1), "Left \"Expected condition (type: C; with constraints: [C < {c:int}]) should be weaker or equal to actual condition (type: X3; with constraints: [X1 < {a:int}, X3 < {c:X1}]). They are not because: type X1 does not equal int.\""),
+  ($(variableNameAndValue 'eFuncDefiningRecordInsideButNotReturningIt), "Right ([];;bool int -> bool [],[])"),
+  ($(variableNameAndValue 'eLetDefiningRecordInsideButNotReturningIt), "Right (bool,[])"),
+  ($(variableNameAndValue 'eFuncDefiningNestedRecordInsideAndReturningIt), "Right ([];;bool int -> X3 [X1 < {a:int}, X3 < {c:X1}],[])"),
+  ($(variableNameAndValue 'eLetDefiningNestedRecordInsideAndReturningIt), "Right (X3,[X1 < {a:int}, X3 < {c:X1}])"),
+  ($(variableNameAndValue 'eFuncTOr), "Right ([];; -> X [X < {a:int v bool}],[])"),
+  ($(variableNameAndValue 'eFuncTOr_withGarbageConstraint), "Right ([];; -> X [X < {a:int}],[])"),
+  ($(variableNameAndValue 'eFuncTOr_postCondition_expectedWeakerThanActual), "Right ([];; -> X [X < {a:int v bool}],[])"),
+  ($(variableNameAndValue 'eFuncTOr_postCondition_expectedWeakerThanActual_moreRecords), "Right ([];; -> X [X < {a:int v bool}],[])"),
+  ($(variableNameAndValue 'eFuncTOr_postCondition_expectedStrongerThanActual), "Left \"Expected condition (type: X; with constraints: [X < {a:int}]) should be weaker or equal to actual condition (type: X1; with constraints: [X1 < {a:int v bool}]). They are not because: type mismatch:\\n  [int]\\n  [int,bool]\""),
+  ($(variableNameAndValue 'eFuncDefiningNestedRecordInsideAndReturningItHavingDifferentlyNamedConstraintVariables), "Right ([];;bool int -> C [A < {a:int}, C < {c:A}],[])"),
+  ($(variableNameAndValue 'eFuncWithUnnecessaryConstraints), "Right ([];;bool int -> X1 [X1 < {a:int}, X2 < {b:bool}],[])"),
+  ($(variableNameAndValue 'eFuncDefiningNestedRecordInsideAndHavingMismatchingConstraintSignature1), "Left \"Expected condition (type: C; with constraints: [C < {c:int}]) should be weaker or equal to actual condition (type: X3; with constraints: [X1 < {a:int}, X3 < {c:X1}]). They are not because: type X1 does not equal int.\""),
 
-  (VARIABLE_NAME(eFuncWithDanglingTypeVariableInSignature), "Left \"Expected condition (type: C; with constraints: [A < {a:int}]) should be weaker or equal to actual condition (type: X3; with constraints: [X1 < {a:int}, X3 < {c:X1}]). They are not because: cannot find type variable named: C in constraints: [A < {a:int}].\""),
-  (VARIABLE_NAME(eCall), "Right (X1,[X1 < {a:int}])"),
-  (VARIABLE_NAME(eCall_eFuncWithWeakConstraints), "Right (X1,[X1 < {a:int}])"),
-  (VARIABLE_NAME(eLetReturningCyclicNestedRecord), "Right (X3,[X1 < {a:X3}, X3 < {c:X1}])"),
-  (VARIABLE_NAME(eFuncReturningCyclicNestedRecord), "Right ([];;bool int -> X3 [X1 < {a:X3}, X3 < {c:X1}],[])"),
-  (VARIABLE_NAME(eCallLet), "Right (X1,[X1 < {a:int}])"),
-  (VARIABLE_NAME(eAdd), "Right (int,[])"),
-  (VARIABLE_NAME(eAdd_wrong), "Left \"TypeError: unsupported operand type(s) for +: int and NoneType\"")
+  ($(variableNameAndValue 'eFuncWithDanglingTypeVariableInSignature), "Left \"Expected condition (type: C; with constraints: [A < {a:int}]) should be weaker or equal to actual condition (type: X3; with constraints: [X1 < {a:int}, X3 < {c:X1}]). They are not because: cannot find type variable named: C in constraints: [A < {a:int}].\""),
+  ($(variableNameAndValue 'eCall), "Right (X1,[X1 < {a:int}])"),
+  ($(variableNameAndValue 'eCall_eFuncWithWeakConstraints), "Right (X1,[X1 < {a:int}])"),
+  ($(variableNameAndValue 'eLetReturningCyclicNestedRecord), "Right (X3,[X1 < {a:X3}, X3 < {c:X1}])"),
+  ($(variableNameAndValue 'eFuncReturningCyclicNestedRecord), "Right ([];;bool int -> X3 [X1 < {a:X3}, X3 < {c:X1}],[])"),
+  ($(variableNameAndValue 'eCallLet), "Right (X1,[X1 < {a:int}])"),
+  ($(variableNameAndValue 'eAdd), "Right (int,[])"),
+  ($(variableNameAndValue 'eAdd_wrong), "Left \"TypeError: unsupported operand type(s) for +: int and NoneType\"")
   ]
 
 outputTypeTests :: [Test]
@@ -75,6 +75,9 @@ outputTypeTests = map (uncurry mapToATest) outputTypeTestsData
     ("For program " ++ show e ++ ":")
     expectedType
     (show $ runCheck e)
+
+eNew :: Exp
+eNew = ENew
 
 eInt42 :: Exp
 eInt42 = EInt 42
