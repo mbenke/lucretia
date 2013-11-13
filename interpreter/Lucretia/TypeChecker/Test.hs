@@ -78,13 +78,7 @@ outputTypeTestsData = [
   ($(variableNameAndValue 'e544), "TODO"),
   ($(variableNameAndValue 'e545), "TODO"),
   ($(variableNameAndValue 'e545), "TODO"),
-  ($(variableNameAndValue 'e545b), "TODO"),
-  ($(variableNameAndValue 'e), "TODO"),
-  ($(variableNameAndValue 'e), "TODO"),
-  ($(variableNameAndValue 'e), "TODO"),
-  ($(variableNameAndValue 'e), "TODO"),
-  ($(variableNameAndValue 'e), "TODO"),
-  ($(variableNameAndValue 'e521), "TODO")
+  ($(variableNameAndValue 'e545b), "TODO")
   ]
 
 outputTypeTests :: [Test]
