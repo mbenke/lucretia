@@ -144,7 +144,7 @@ eIfTOr =
   ELet "_"
   (EIf eTrue
     (ESet "foo" "a" eInt42)
-    (ESet "foo" "a" $ eTrue)
+    (ESet "foo" "a" eTrue)
   ) $
   EVar "foo"
 
@@ -154,7 +154,7 @@ eIfTFieldUndefined =
   ELet "_"
   (EIf eTrue
     (ESet "foo" "a" eInt42)
-    (ESet "foo" "b" $ eTrue)
+    (ESet "foo" "b" eTrue)
   ) $
   EVar "foo"
 
@@ -164,7 +164,7 @@ eIfHasAttr =
   ELet "_"
   (EIf eTrue
     (ESet "foo" "a" eInt42)
-    (ESet "foo" "b" $ eTrue)
+    (ESet "foo" "b" eTrue)
   ) $
   EIfHasAttr "foo" "a"
     (EGet "foo" "a")
@@ -176,7 +176,7 @@ eIfHasAttr_noSuchField =
   ELet "_"
   (EIf eTrue
     (ESet "foo" "a" eInt42)
-    (ESet "foo" "b" $ eTrue)
+    (ESet "foo" "b" eTrue)
   ) $
   EIfHasAttr "foo" "c"
     (EInt 6)
