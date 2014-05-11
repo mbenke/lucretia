@@ -69,7 +69,9 @@ pIf = EIf <$> (kw "if" *> pExp)
           <*> (kw "else" *> pExp)
 
 pLet :: Parser Exp
-pLet = ELets <$> (kw "let" *> pDefs) <*> (kw "in" *> pExp)
+pLet = ELet <$> (kw "let" *> identifier)
+            <*> (symbol "=" *> pExp)
+            <*> (kw "in" *> pExp)
 
 pNew = kw "new" >> return ENew
 
@@ -80,7 +82,6 @@ pAdd = symbol "+" >> return EAdd
 
 pTerm = pF
 pF = EInt <$> integer <|> pIdExp <|> (parens pExp >>= pMaybeCall) 
-          <|> EDeref <$> (EVar <$> (symbol "*" >> identifier))
           <|> (kw "None" >> return ENone)
           
 --pRec = symbol "{" >> symbol "}" >> return ERecEmpty

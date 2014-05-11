@@ -76,7 +76,10 @@ instance Show Val where
   show (VLoc l) = "loc:"++show l
   show VNone = "None"
   show (VRec map) =  show $ Map.toAscList map
-  show (VFun f) = show f
+  show (VFun xs f) = showVFun (VFun xs f)
+  
+showVFun :: Val -> String
+showVFun (VFun xs f) = "("++(intercalate ", " xs)++").apply: "++show f
   
 getVInt :: Val -> IM Integer
 getVInt (VInt i) = return i
@@ -90,7 +93,7 @@ getVRec :: Val -> IM Record
 getVRec (VRec r) = return r
 getVRec v = throwError $ "Not a record: "++show v
 
-getVFun :: Val -> IM ([Name] Exp)
+getVFun :: Val -> IM ([Name], Exp)
 getVFun (VFun as body) = return (as, body)
 getVFun v = throwError $ "Not a function: "++show v
 
@@ -255,12 +258,6 @@ eval (ELet n e1 e0) = do
      v0 <- eval e0
      leaveScope
      return v0
-eval (ELets ds e0) = do
-     enterScope
-     execDefs ds
-     v0 <- eval e0
-     leaveScope
-     return v0
 eval ENew = do     
      l <- alloc
      updateStore l (VRec Map.empty)
@@ -288,7 +285,7 @@ eval (ESet n1 n2 e) = do
   updateStore l (VRec (Map.insert n2 v r))
   return v
 eval ENone = return VNone
-eval (EFunDecl f) = return (VFun f)
+eval (EFunDecl xs e) = return (VFun xs e)
 eval call@(EFunCall (EVar "print") es) = do
   vs <- mapM eval es
   let line = (intercalate " " . map show) vs

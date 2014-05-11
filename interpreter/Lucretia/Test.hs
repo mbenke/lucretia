@@ -111,9 +111,6 @@ TODO: Migrate the old tests below to the new way of testing.
     - adding possibility for testing programs by their ASTs to the new way of testing.
 -}
 
-derefVar :: Name -> Exp
-derefVar = EDeref . EVar
-
 testParserAndInterpreter :: IO ()
 testParserAndInterpreter = do
   testException
@@ -167,10 +164,6 @@ prog2 = [
   ("y" , 2),
   ("_",EVar "x"+ EVar "y")
   ]
-prog3 = [ 
-  ("y", 
-   (ELet "x" eInt42 (EVar "x"))),
-  ("_",derefVar "y") ]
 -- undefined var
 bad1 = [("_", EVar "x")]
 

@@ -3,6 +3,7 @@ module PythonTypeChecker where
 main :: IO ()
 main = do
   pythonSource <- getContents
+
   let lucretiaSource = pyToLu pythonSource
   --verbose <- (== "-v") args 1
   let verbose = True
