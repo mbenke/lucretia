@@ -27,8 +27,8 @@
 --
 -----------------------------------------------------------------------------
 
---module Lucretia.TypeChecker (runCheck, checkProg) where
 module Lucretia.TypeChecker where
+--module Lucretia.TypeChecker ( runCheck ) where
 
 import Prelude hiding (all)
 

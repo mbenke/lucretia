@@ -30,8 +30,10 @@ pyToLu py = addStores $ c py
 class Convertable a where
   c :: a -> Exp
 
-sMain = "main" -- ^ storing python programme's variables (objects, classes, etc)
-sTemp = "temp" -- ^ storing lucretia programme's temporary (helper) variables
+-- | Storing python programme's variables (objects, classes, etc)
+sMain = "main"
+-- | Storing lucretia programme's temporary (helper) variables
+sTemp = "temp"
 
 addStores :: Exp -> Exp
 addStores e =
