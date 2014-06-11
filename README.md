@@ -17,7 +17,7 @@ $ ./lucre_interpreter < LUCRETIA_SOURCE_FILE
 ### Run tests
 
 ~~~~ {.bash}
-$ cabal tests
+$ cabal test
 ~~~~
 
 ## Documentation
