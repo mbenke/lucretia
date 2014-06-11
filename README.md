@@ -1,36 +1,31 @@
-# Lucretia
+# Lucretia: A type-checker for Python
 
-*A type-checker for Python and an intermediate language*
+We use an intermediate abstract language called `Lucretia` to which Python code is (will be) compilled.
 
-## About
-
-An aim is to type-check as much as possible from Python code. We use an intermediate abstract language called `Lucretia` to which Python code is (will be) compilled.
-
-## Installing package
-
+## How to run
+### Install
 ~~~~ {.bash}
 $ cabal install
 ~~~~
 
-## Running Lucretia interpreter
+### Run Lucretia interpreter
 
 ~~~~ {.bash}
 $ ./lucre_interpreter < LUCRETIA_SOURCE_FILE
 ~~~~
 
-## Running tests
+### Run tests
 
 ~~~~ {.bash}
 $ cabal tests
 ~~~~
 
-## Type-checker documentation
+## Documentation
 
-[Documentation](dist/doc/html/lucretia/index.html) is describing how the implementation of the Type Checker is connected with the theory describing the type-checker in the white paper (to be published).
+[Documentation](dist/doc/html/lucretia/index.html) is describing how the implementation is connected with the theory from the white paper about Lucretia (to be published).
 
-To compile this documentation, run:
+To compile the documentation, run:
 
 ~~~~ {.bash}
 $ cabal haddock --hyperlink-source
 ~~~~
-
