@@ -1,0 +1,83 @@
+Name:		        lucretia
+Synopsis:               A type-checker for Python and an intermediate language Lucretia.
+Description:            A type-checker for Python and an intermediate language Lucretia.
+Version:	        0.2
+Author:		        Marcin Benke
+       		        Michał Oniszczuk <michal.oniszczuk@gmail.com>
+Homepage:               https://github.com/miconi/lucretia
+Build-Type:	        Simple
+Cabal-Version:          >=1.8
+
+executable lucre_interpreter
+  hs-source-dirs:       src
+  main-is:              lucre_interpreter.hs
+  build-depends:        base >= 4,
+                        data-lens-template,
+                        data-lens-fd,
+                        containers,
+                        mtl >= 1.1,
+                        parsec >=3
+
+--executable lucre_typechecker
+--  main-is:              lucre_typechecker.hs
+
+--executable python_typechecker
+--  main-is:              python_typechecker.hs
+
+library
+  hs-source-dirs:       src
+  exposed-modules:      Lucretia.Interpreter.Exception,
+                        Lucretia.Interpreter,
+                        Lucretia.Language.Definitions,
+                        Lucretia.Language.Syntax,
+                        Lucretia.Language.Types,
+                        Lucretia.Parser.ApplicativeParser,
+                        --Lucretia.Parser.ParsecParser,
+                        Lucretia.PrettyPrint,
+                        Lucretia.TypeChecker.MonomorphicModuloNames,
+                        Lucretia.TypeChecker,
+                        PythonToLucretia,
+                        Util.Debug,
+                        Util.Diff,
+                        Util.HUnit,
+                        Util.MapLenses,
+                        Util.Monad,
+                        Util.OrFail,
+                        Util.PrettyPrint,
+                        Util.VariableName
+  build-depends:        base >= 4,
+                        containers,
+                        data-lens-template,
+                        data-lens-fd,
+                        either-unwrap >= 1.1,
+                        HUnit,
+                        language-python,
+                        mtl >= 1.1,
+                        parsec >=3,
+                        pretty,
+                        process,
+                        template-haskell,
+                        test-framework,
+                        test-framework-hunit
+
+test-suite test
+  hs-source-dirs:       test
+  main-is:              test.hs
+  type:                 exitcode-stdio-1.0
+  build-depends:        base,
+                        containers,
+                        data-lens >= 2.10.0,
+                        data-lens-template >= 2.1.5,
+                        data-lens-fd >= 2.0.2,
+                        hashable,
+                        HUnit,
+                        language-python,
+                        lucretia,
+                        mtl >= 1.1,
+                        QuickCheck,
+                        test-framework,
+                        test-framework-quickcheck2,
+                        test-framework-hunit,
+                        pretty-show,
+                        pretty
+
