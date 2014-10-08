@@ -172,46 +172,65 @@ matchExp (EFunCall f xsCall) ppCall = do
 
 
 -- TODO change to [TFunSingle]
-matchExp (EFunDef argNames maybeDeclaredType funBody) _ = do
-  funType <- case maybeDeclaredType of
-    Nothing           -> inferType argNames funBody
-    Just declaredType -> do
-      -- TODO check declared type
-      --checkDeclaredType declaredType
-      return declaredType
+matchExp (EFunDef argNames maybeSignature funBody) _ = do
+  funType <- case maybeSignature of
+    Just signature -> checkSignature signature
+    Nothing        -> inferSignature argNames funBody
   postPointer $ tOrFromTFunSingle funType
 
   where
-    -- checkDeclaredType (TFunSingle argTypes tDecl ppDecl) = do
-    --   let argsPP = argsPPfromTypes argTypes
-
-    inferType :: [IVar] -> Defs -> CM TFunSingle
-    inferType argNames funBody = do
-      let argTypes = fmap (\n -> "Arg_"++n) argNames
+    checkSignature :: TFunSingle -> CM TFunSingle
+    checkSignature signature@(TFunSingle argTypes (tDecl, ppDecl)) = do
       let argsPP = argsPPfromTypes argNames argTypes
-
-      (returnId, withArgsPP) <- matchBlock funBody argsPP -- TODO insert declared PreConstraints here
-      checkEmptyPreEnv withArgsPP
-      let withoutEnvPP = eraseEnv withArgsPP
-
+      -- add ppDecl to _post argsPP
+      funType <- matchBody funBody argTypes argsPP
+      -- checkEmptyPre funType
+      -- checkPostWeaker funType ppDecl
       -- TODO clean constraints
-      return $ TFunSingle argTypes (returnId, withoutEnvPP)
+      return signature
+
+        where
+        checkEmptyPre :: TFunSingle -> CM ()
+        checkEmptyPre (TFunSingle _ (_, PrePost pre _)) =
+          guard $ pre == Map.empty -- not emptyConstraints, because environment was removed in matchBody
+
+        -- checkPostWeaker :: TFunSingle -> PrePost -> CM ()
+        -- checkPostWeaker (TFunSingle _ (_, PrePost _ postActual) (PrePost _ postDecl) =
+      -- check _post funType 
+
+    inferSignature :: [IVar] -> Defs -> CM TFunSingle
+    inferSignature argNames funBody = do
+      let argTypes = fmap (\n -> "A"++n) argNames
+      let argsPP = argsPPfromTypes argNames argTypes
+      matchBody funBody argTypes argsPP
+
+    matchBody :: Defs -> [IType] -> PrePost -> CM TFunSingle
+    matchBody funBody argTypes argsPP = do
+      (funReturnId, funBodyPP) <- matchBlock funBody argsPP
+      checkEmptyPreEnv funBodyPP
+      let funBodyNoEnvPP = eraseEnv funBodyPP
+      -- TODO clean constraints
+      return $ TFunSingle argTypes (funReturnId, funBodyNoEnvPP)
 
         where
         -- | Checks that no variable was referenced, apart from the arguments
         checkEmptyPreEnv :: PrePost -> CM ()
-        checkEmptyPreEnv pp = guard $ Map.lookup env (_pre pp) == Nothing
+        checkEmptyPreEnv pp = guard $ getEnv (_pre pp) == emptyRec
 
-        eraseEnv = undefined
+        eraseEnv :: PrePost -> PrePost
+        eraseEnv (PrePost pre post) = PrePost (eraseEnv' pre) (eraseEnv' post)
+        eraseEnv' :: Constraints -> Constraints
+        eraseEnv' = Map.delete env
 
-        argsPPfromTypes argNames argTypes =
-          let argsEnvRec = Map.fromList $ zip argNames (requiredList argTypes) in 
-              postFromTRec env argsEnvRec
 
-        postFromTRec :: IType -> TRec -> PrePost
-        postFromTRec env argsEnvRec =
-          PrePost emptyConstraints
-                  (singletonConstraint env $ tOrFromTRec argsEnvRec)
+    argsPPfromTypes argNames argTypes =
+      let argsEnvRec = Map.fromList $ zip argNames (requiredList argTypes) in 
+          postFromTRec env argsEnvRec
+
+    postFromTRec :: IType -> TRec -> PrePost
+    postFromTRec env argsEnvRec =
+      PrePost emptyConstraints
+              (singletonConstraint env $ tOrFromTRec argsEnvRec)
 
 postPointerPrimitive :: Kind -> CM Type
 postPointerPrimitive kind = postPointer $ tOrPrimitive kind

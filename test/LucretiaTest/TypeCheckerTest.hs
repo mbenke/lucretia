@@ -55,6 +55,8 @@ outputTypeTestsData =
   , ($(nv 'bSetAttr_xa__Set_xa_to_yb__Get_yb), "Y with Constraints: [A < {b: Y}, Env < {_: Y, x: X, y: A}, X < {a: Y}, Y < int]")
   , ($(nv 'bSetAttr_xa__Set_xa_to_yb__Set_xa__Get_yb), "Y with Constraints: [A < {b: Y}, E < string, Env < {_: Y, x: X, y: A}, X < {a: E}, Y < int]")
   , ($(nv 'bSetAttr_xa__Set_x_to_y__Set_xa__Get_ya), "Z with Constraints: [Env < {_: Z, x: X, y: X}, X < {a: Z}, Z < int]")
+  , ($(nv 'bFun_identity), "Y with Constraints: [Env < {identity: Y}, Y < func (Ax) [] -> Ax []]")
+  , ($(nv 'bFun_identity_setFields), "C with Constraints: [C < func (Ax, Ay, Az) [Ax < {}] -> Ax [Ax < {a: Ay, b: Az}], Env < {identity: C}]")
   ]
 
 --bSetVar_x, bSetVar_xGet_x, bSetVar_xyGet_y, bGetUndefinedVar, bNew :: Defs
@@ -131,5 +133,19 @@ bSetAttr_xa__Set_x_to_y__Set_xa__Get_ya =
   , SetVar "y" $ EGetVar "x"
   , SetAttr "x" "a" cInt
   , SetVar "_" $ EGetAttr "y" "a"
+  ]
+bFun_identity =
+  [ SetVar "identity" $
+    EFunDef ["x"] Nothing $
+    [ SetVar "_" $ EGetVar "x"
+    ]
+  ]
+bFun_identity_setFields =
+  [ SetVar "identity" $
+    EFunDef ["x", "y", "z"] Nothing $
+    [ SetAttr "x" "a" $ EGetVar "y"
+    , SetAttr "x" "b" $ EGetVar "z"
+    , SetVar "_" $ EGetVar "x"
+    ]
   ]
 

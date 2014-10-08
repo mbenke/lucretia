@@ -231,8 +231,20 @@ showKind (KString, _) = "string"
 showKind (KBool,   _) = "bool"
 showKind (KNone,   _) = "None"
 showKind (KRec, TRec t) = showRec t
-showKind (KFun, TFun f) = show f
+showKind (KFun, TFun f) = showFun f
 showKind other          = show other
+
+showFun :: TFunSingle -> String
+showFun (TFunSingle argIds (returnId, (PrePost pre post))) = concat
+  [ "func ("
+  , intercalate ", " argIds
+  , ") "
+  , showConstraints pre
+  , " -> "
+  , returnId
+  , " "
+  , showConstraints post
+  ]
 
 showRec :: TRec -> String
 showRec r = concat ["{", showFields r, "}"]
