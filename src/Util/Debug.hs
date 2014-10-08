@@ -1,4 +1,4 @@
-module Util.Debug(traceShowId, traceShowIdHl, traceM) where
+module Util.Debug(traceShowId, traceShowIdHl, traceShowIdHlWith, traceM) where
 
 import Debug.Trace
 
@@ -12,6 +12,13 @@ traceShowIdHl :: (Show a) => a -> a
 traceShowIdHl a = trace (
   "\n----------------------------------------\n"
   ++ show a ++
+  "\n----------------------------------------\n"
+  ) a
+
+traceShowIdHlWith :: (a -> String) -> a -> a
+traceShowIdHlWith showA a = trace (
+  "\n----------------------------------------\n"
+  ++ showA a ++
   "\n----------------------------------------\n"
   ) a
 

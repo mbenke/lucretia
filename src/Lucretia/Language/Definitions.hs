@@ -1,11 +1,16 @@
-module Lucretia.Language.Definitions where
+-----------------------------------------------------------------------------
+-- |
+-- Copyright   :  (c) Michał Oniszczuk 2011 - 2014
+-- Maintainer  :  michal.oniszczuk@gmail.com
+--
+-- Basic definitions.
+-----------------------------------------------------------------------------
+module Lucretia.Language.Definitions (IRec, IVar, IAttr, IType) where
 
-type Name = String -- TODO replace with types below in Interpreter.hs
+type Identifier = String
 
-type Var = String
-type Field = String
-type Label = String
-type Param = String
-type TVar = String
-
+type IRec  = Identifier
+type IVar  = Identifier
+type IAttr = Identifier
+type IType = Identifier
 

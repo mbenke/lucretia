@@ -8,8 +8,9 @@
 
 {-# LANGUAGE TemplateHaskell #-}
 module Util.VariableName
-  ( variableNameAndValue
-  , printVariableNameAndValue
+  ( printVariableNameAndValue
+  , nv
+  , variableNameAndValue
   )
 where
 
@@ -28,6 +29,8 @@ import Language.Haskell.TH.Syntax
 variableNameAndValue :: Name -> ExpQ
 --variableNameAndValue n = [| ($(lift $ nameBase n), $(varE n)) |]
 variableNameAndValue n = tupE [lift $ nameBase n, varE n]
+
+nv = variableNameAndValue
 
 -- | Prints out a variable for debug purposes. For example:
 --

@@ -1,17 +1,11 @@
 # Lucretia: A type-checker for Python
 
-We use an intermediate abstract language called `Lucretia` to which Python code is (will be) compilled.
+We use an intermediate abstract language called `Lucretia` to which Python will be compilled (to be implemented). For now the package provides functionality of type-checking programmes in `Lucretia`.
 
 ## How to run
 ### Install
 ~~~~ {.bash}
 $ cabal install
-~~~~
-
-### Run Lucretia interpreter
-
-~~~~ {.bash}
-$ ./lucre_interpreter < LUCRETIA_SOURCE_FILE
 ~~~~
 
 ### Run tests

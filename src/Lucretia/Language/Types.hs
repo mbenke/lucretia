@@ -1,3 +1,10 @@
+-----------------------------------------------------------------------------
+-- |
+-- Copyright   :  (c) Michał Oniszczuk 2011 - 2014
+-- Maintainer  :  michal.oniszczuk@gmail.com
+--
+-- Types used in Lucretia TypeChecker and in function signature declarations.
+-----------------------------------------------------------------------------
 {-# LANGUAGE TemplateHaskell, FlexibleInstances, FlexibleContexts #-}
 
 module Lucretia.Language.Types where
@@ -8,7 +15,9 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-import Lucretia.Language.Definitions (Var, TVar, Field)
+import Util.Debug
+
+import Lucretia.Language.Definitions
 
 import Data.Lens (Lens, mapLens, getL)
 import Data.Lens.Template (makeLens)
@@ -16,115 +25,219 @@ import Prelude hiding ((.))
 import Control.Category ((.))
 import Util.MapLenses (mapInsertLens)
 
+-----------------------------------------------------------------------------
+-- |
+-- Copyright   :  (c) Michał Oniszczuk 2011 - 2014
+-- Maintainer  :  michal.oniszczuk@gmail.com
+--
+-- Type-checker types (including constraints) and environment definitions.
+-----------------------------------------------------------------------------
+-- module Lucretia.Language.Types where
+
 -- * Language.Types (/Defition 2.1 (Language.Types)/ in wp)
+-- in one sentence: IAttr ~> TAttr = (Definedness, IType) ~> TOr = Map Kind TSingle
 
--- | @t_b@ /and/ @t@ in wp
-data Type
-  = TInt -- ^ @c@ in wp
-  | TBool -- ^ @c@ in wp
-  | TStr -- ^ @c@ in wp
-  | TNone -- ^ @c@ in wp
-  | TVar TVar -- ^ @X@ in wp
-  | TRec Rec -- ^ @t_r@ in wp
-  | TOr (Set Type) -- ^ @t_b,1 v t_b,2@ in wp
-  | TFieldUndefined -- ^ @_|_@ in wp
-  | TFunc Constraints Env [Type] Type Constraints -- ^ @[t1, …, tn; Psi_1] => [tn+1; \Psi_2]@ in wp
-  deriving (Eq, Ord)
+type ProgrammeType = [(IType, Constraints)]
 
--- * Record Type (@t_r = {l : t} | {}@ in wp)
+type Type = (IType, PrePost)
 
--- | Record (models an object). A mapping from field names to Language.Types.
---
+-- | A mapping from type-variable names to types.
+-- List of pairs @X <# t_r@ in wp.
+type Constraints = Map IType TOr
+
+-- Invariant: TOr can contain at most one TInt, one TString, TRec, ...
+-- This is achieved by having a Map with Kind as the type of keys.
+-- Invariant: TOr contains at least one Kind / single type.
+type TOr         = Map Kind TSingle
+
+data Kind        = KInt
+                 | KString
+                 | KBool
+                 | KNone
+                 | KRec
+                 | KFun
+
+                 deriving ( Eq, Ord, Show )
+
+data TSingle     = TRec TRec
+                 -- | TFunOr TFunOr --TODO intersection types
+                 | TFun TFunSingle
+                 | TPrimitive -- kind without parameters
+
+                 deriving ( Eq, Ord, Show )
+
+-- | Record (models an object). A mapping from attr names to Language.Types.
 -- List of pairs @l : t@ in wp.
---
 -- It is the same type as 'Env'
-type Rec = Map Field Type
+type TRec = Map IAttr TAttr
 
-oneFieldTRec :: Field -> Type -> Rec
-oneFieldTRec a t = Map.fromList [(a,t)]
+type TAttr = (Definedness, IType)
 
-emptyRecType :: Rec
-emptyRecType = Map.empty
+data Definedness = Required | Optional -- ^ that case is unneeded: | NotDefined
+  deriving (Eq, Ord, Show)
 
+type TFun = Maybe TFunSingle
+--data TFun = Maybe TFunOr
+--type TFunOr        = Set TFunSingle
+data TFunSingle  = TFunSingle { funArgs :: [IType]
+                              , funType ::   Type --FunPrePost
+                              }
+                 deriving ( Eq, Ord, Show )
+
+data FunPrePost = InheritedPP | DeclaredPP PrePost
 
 -- * Constraints (@Psi@ in wp)
 
--- | A mapping from Type Variable Names to Record Language.Types.
+-- | Pre- and post-Constraints (respectively: the left and the right
+-- hand side of a type-checker rule / function signature).
+data PrePost = PrePost { _pre  :: Constraints
+                       , _post :: Constraints
+                       }
+                 deriving ( Eq, Ord, Show )
+
+-- TODO RTR with Conditions in place of Constraints:
+-- data Conditions = Conditions { _environment :: TRec
+--                              , _constraints :: Constraints
+--                              }
+-- + no special handling in renaming
+-- + no special entry in emptyConstraints
+-- + no assertions in getEnv, fromEnv
+
+$(makeLens ''PrePost)
+
+emptyPrePost :: PrePost
+emptyPrePost = PrePost emptyConstraints emptyConstraints
+
+emptyConstraints :: Constraints
+emptyConstraints = Map.singleton env $ tOrEmptyRec
+
+-- showConstraints c = concat ["[",showAttrs attrs,"]"] where
+--   attrs = Map.toList c
+--   showAttrs attrs = intercalate ", " (map showAttr attrs)
+--   showAttr (l,t) = concat [l," < ", showRec t]
+
+-- * Record Type (@t_r = {l : t} | {}@ in wp)
+
+-- showRec :: TRec -> String 
+-- showRec r = concat ["{",showAttrs attrs,"}"] where
+--   attrs = Map.toList r 
+--   showAttrs attrs = intercalate ", " (map showAttr attrs)
+--   showAttr (l,t) = concat [l,":",show t]
+
+emptyRec :: TRec
+emptyRec = Map.empty
+
+env :: IType
+env = "Env"
+
+xId :: IType
+xId = "xId"
+
+aId :: IType
+aId = "aId"
+
+yId :: IType
+yId = "yId"
+
+fId :: IType
+fId = "fId"
+
+undefinedId :: IType
+undefinedId = "undefinedId"
+
+toEmptyRec id = (id, tOrEmptyRec)
+
+tOrEmptyRec :: TOr
+tOrEmptyRec = tOrFromTRec emptyRec
+
+-- envToX :: IAttr -> (IType, TOr)
+-- envToX x = toSingletonRec env x xId
+
+toSingletonRec :: IType -> IAttr -> IType -> (IType, TOr)
+toSingletonRec xId a aId = (xId, tOrSingletonRec a aId)
+
+tOrSingletonRec :: IAttr -> IType -> TOr
+tOrSingletonRec a t = tOrFromTRec $ Map.singleton a (Required, t)
+
+tOrFromTSingle :: TSingle -> TOr
+tOrFromTSingle tSingle = Map.singleton (kind tSingle) tSingle
+
+tOrFromTRec :: TRec -> TOr
+tOrFromTRec = tOrFromTSingle . TRec
+
+tOrFromTFunSingle :: TFunSingle -> TOr
+tOrFromTFunSingle = tOrFromTSingle . TFun
+
+-- | "env" type pointer is always present in Constraints and it is always a record
+getEnv :: Constraints -> TRec
+getEnv cs = tRec
+  where TRec tRec = tOr Map.! KRec
+        tOr = Map.findWithDefault tOrEmptyRec env cs
+
+lookupInEnv :: IVar -> Constraints -> Maybe TAttr
+lookupInEnv x cs = Map.lookup x $ getEnv cs
+
+-- | Lookup 'TOr' for a given 'IType'.
 --
--- List of pairs @X <# t_r@ in wp.
-type Constraints = Map TVar Rec
+-- The function will return the corresponding values as @('Just' value)@,
+-- or 'Nothing' if 'IType' refers to a polymorphic type.
+lookupInConstraints :: IType -> Constraints -> Maybe TOr
+lookupInConstraints = Map.lookup
 
-emptyConstraints :: Map.Map TVar Rec
-emptyConstraints = Map.fromList []
+singletonConstraint :: IType -> TOr -> Constraints
+singletonConstraint = Map.singleton
 
--- * Environment: Variable Names to Language.Types (Sigma in wp)
+singletonTRec :: IAttr -> TAttr -> TRec
+singletonTRec = Map.singleton
 
--- | A mapping from Variable Names to Language.Types.
---
--- It is the same type as 'Env'
-type Env = Map Var Type
+tOrPrimitive :: Kind -> TOr
+tOrPrimitive kind = Map.singleton kind TPrimitive
 
-emptyEnv :: Env
-emptyEnv = Map.empty
-
-extendEnv :: Var -> Type -> Env -> Env
-extendEnv = Map.insert
-
--- * Locations to Type Variable Names (Gamma in wp)
-
-data CheckState = CheckState { 
-  _constraints :: Constraints,
-  _freshInts :: [Int]
-}
-  deriving Eq
-
-initState :: CheckState
-initState = CheckState Map.empty [1..]
-  
--- * Lenses
-
-$(makeLens ''CheckState)
-
-record :: TVar -> Lens CheckState Rec
-record v = mapInsertLens v . constraints
-
-field :: Field -> TVar -> Lens CheckState (Maybe Type)
-field a v = mapLens a . record v
+kind :: TSingle -> Kind
+kind (TRec _) = KRec
+kind (TFun _) = KFun
 
 -- * Show instance
 
-instance Show CheckState where
-  show = showConstraints . getL constraints
-  
-showConstraints cs = concat ["[",showFields fields,"]"] where
-  fields = Map.toList cs
-  showFields fields = intercalate ", " (map showField fields)
-  showField (l,t) = concat [l," < ", showRec t]
+showProgrammeType :: ProgrammeType -> String
+showProgrammeType [] = "Programme does not type-check to any type"
+showProgrammeType ts = intercalate " AND " $ map showSingleType ts
+  where
+  showSingleType (i, cs) = i++" with Constraints: "++showConstraints cs
 
-showRec :: Rec -> String 
-showRec r = concat ["{",showFields fields,"}"] where
-  fields = Map.toList r 
-  showFields fields = intercalate ", " (map showField fields)
-  showField (l,t) = concat [l,":",show t]
-  
-showEnv :: Env -> String
-showEnv e = showPairs pairs where
-  pairs = Map.toList e 
-  showPairs pairs = intercalate ", " (map showPair pairs)
-  showPair (l,t) = concat [l,":",show t]
-  
-instance Show Type where
-  show TInt = "int"
-  show TBool = "bool"
-  show TStr  = "string"  
-  show TNone = "NoneType"
-  show (TVar v) = v
-  show (TRec r) = showRec r
-  show (TOr ts) = intercalate " v " $ map show $ Set.toList ts
-  show (TFieldUndefined) = "undefined"
-  show (TFunc constraintsBefore env paramTypes bodyType constraintsAfter) = 
-    concat [showConstraints constraintsBefore,";",showEnv env, ";",
-            intercalate " " (map show paramTypes), " -> ", 
-            show bodyType, " ", showConstraints constraintsAfter
-           ]
+showType :: Type -> String
+showType (i, pp) = i++", "++showPrePost pp
+
+showPrePost :: PrePost -> String
+showPrePost (PrePost pre post) = concat
+  [ "Pre="
+  , showConstraints pre
+  , " Post="
+  , showConstraints post
+  ]
+
+showConstraints :: Constraints -> String
+showConstraints cs = concat ["[", showFields cs, "]"]
+  where
+  showFields cs = intercalate ", " (map showField $ Map.toList cs)
+  showField (l, t) = concat [l," < ", showTOr t]
+
+showTOr :: TOr -> String
+showTOr tOr = intercalate " v " $ map showKind $ Map.toList tOr
+
+showKind :: (Kind, TSingle) -> String
+showKind (KInt,    _) = "int"
+showKind (KString, _) = "string"
+showKind (KBool,   _) = "bool"
+showKind (KNone,   _) = "None"
+showKind (KRec, TRec t) = showRec t
+showKind (KFun, TFun f) = show f
+showKind other          = show other
+
+showRec :: TRec -> String
+showRec r = concat ["{", showFields r, "}"]
+  where
+  showFields r = intercalate ", " $ map showField $ Map.toList r
+  showField (a, (Required, i)) = concat [a, ": ", i]
+  showField (a, (Optional, i)) = concat ["optional ", a, ": ", i]
 

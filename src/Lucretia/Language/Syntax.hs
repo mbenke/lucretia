@@ -1,44 +1,39 @@
+-----------------------------------------------------------------------------
+-- |
+-- Copyright   :  (c) Michał Oniszczuk 2011 - 2014
+-- Maintainer  :  michal.oniszczuk@gmail.com
+--
+-- Instructions and expressions used in Lucretia language.
+-----------------------------------------------------------------------------
 module Lucretia.Language.Syntax where
 
-import Lucretia.Language.Types
-import Lucretia.Language.Definitions (Var, Field, Label, Param)
+import Lucretia.Language.Definitions (IRec, IVar, IAttr, IType)
+import Lucretia.Language.Types (TFun)
 
 type Program = Defs
 type Defs = [Def]
-type Def = (Var, Exp)
 
-data Exp 
-  = EInt Integer
-  | EBool Bool
-  | EStr String
+data Def
+  = SetVar  IVar       Exp
+  | SetAttr IVar IAttr Exp
+
+  deriving (Eq, Ord, Show)
+
+data Exp
+  = EInt    Int
+  | EString String
+  | EBool   Bool
   | ENone -- ^ () in wp
   | ENew
 
-  | EAdd Exp Exp
-  | EMul Exp Exp
+  | EGetVar  IVar
+  | EGetAttr IVar IAttr
 
-  | EVar Var
-  | ELet Var Exp Exp
+  | EIf IVar Defs Defs
+  | EIfHasAttr IVar IAttr Defs Defs
 
-  | EGet Var Field
-  | ESet Var Field Exp
+  | EFunDef  [IVar] TFun Defs -- f = def (x, y, z) :: (X, Y, Z) [X < {a : Y}, Y < {}, Z < int] -> R [X < {a : Y}, Y < {}, Z < int, R < {b : Z}] { body }
+  | EFunCall IVar [IVar] -- f (x, y, z)
 
-  | EIf Exp Exp Exp
-  | EIfHasAttr Var Field Exp Exp
-
-  | EFunDecl [Var] Exp
-  | EFunCall Exp [Exp]
-  
-  deriving (Eq,Show)
-
-programFromExp :: Exp -> Program
-programFromExp e = [("_",e)]
-
-instance Num Exp where
-  fromInteger = EInt
-  (+) = EAdd
-  (*) = undefined
-  (-) = undefined
-  signum = undefined
-  abs = undefined
+  deriving (Eq, Ord, Show)
 
