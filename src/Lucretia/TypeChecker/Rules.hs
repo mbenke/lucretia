@@ -7,6 +7,7 @@
 -----------------------------------------------------------------------------
 module Lucretia.TypeChecker.Rules ( matchBlock ) where
 
+import Prelude hiding ( error )
 import Control.Monad ( guard )
 import Control.Monad.State ( lift )
 import Data.Map as Map hiding ( update )
@@ -19,14 +20,14 @@ import Lucretia.Language.Definitions
 import Lucretia.Language.Syntax
 import Lucretia.Language.Types
 
-import Lucretia.TypeChecker.Monad ( freshIType, CM )
+import Lucretia.TypeChecker.Monad ( error, freshIType, CM )
 import Lucretia.TypeChecker.Renaming ( applyRenaming, getRenamingOnEnv, freeVariables )
 import Lucretia.TypeChecker.Update ( update, extend )
 import Lucretia.TypeChecker.Weakening ( checkWeaker, weaker )
 
 
-matchBlock :: Defs -> PrePost -> CM Type
-matchBlock xs pp = matchBlockT xs (undefinedId, pp)
+matchBlock :: Defs -> Constraints -> CM Type
+matchBlock xs post = matchBlockT xs (undefinedId, PrePost emptyConstraints post)
 
 -- | Bind Pre- & Post-Constraints 'pp' of a code block B with Type of the next statement x, producing Type of the whole Defs including statement x.
 -- B x1
@@ -134,7 +135,7 @@ matchExp (EFunCall f xsCall) ppCall = do
   checkArgsLength xsCall tsDecl
   let ppInherited = ppDecl -- TODO InheritedPP
 
-  let ppWithArgs = addArgsToEnv xsCall tsDecl ppInherited
+  let ppWithArgs = addArgsPP xsCall tsDecl ppInherited
   return (iDecl, ppWithArgs)
 
     where
@@ -159,22 +160,8 @@ matchExp (EFunCall f xsCall) ppCall = do
       guard $ length xsCall == length tsDecl
         --("Function "++f++" is applied to "++show (length xsCall)++" arguments, but "++show (length tsDecl)++" arguments should be provided.\n")
 
-    addArgsToEnv :: [IAttr] -> [IType] -> PrePost -> PrePost
-    addArgsToEnv xsCall tsDecl ppInherited =
-      let args = zip xsCall tsDecl in
-      let newEnv = recFromPairs args in
-      setEnv newEnv ppInherited
 
-    --TODO impl
-    --setEnv :: 
-    setEnv = undefined
-    --ppFromType `modL` (\pp -> pp `update` (env, newEnv)) $ tDeclInherited
-    recFromPairs :: [(IAttr, IType)] -> TOr
-    recFromPairs = undefined
-    --recFromPairs xs = f
-
-
--- TODO change to [TFunSingle]
+-- TODO implement TFunOr
 matchExp (EFunDef argNames maybeSignature funBody) _ = do
   funType <- case maybeSignature of
     Just signature -> checkSignature signature
@@ -183,30 +170,32 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
 
   where
     checkSignature :: TFunSingle -> CM TFunSingle
-    checkSignature declared@(TFunSingle argTypes iDecl ppDecl) = do
-      let argsPP = argsPPfromTypes argNames argTypes
-          -- add pre_ ppDecl (function signatures) as post
-      infered <- matchBody funBody argTypes argsPP
-      --guard $ iDecl == iInfered
-      checkPreWeaker  declared infered
-      checkPostWeaker infered declared
+    checkSignature decl@(TFunSingle argTypes iDecl ppDecl) = do
+      -- We are adding pre-constraints from the function signature
+      -- to make available at the call site the signatures
+      -- of the functions passed as parameters
+      let argCs = addArgsCs argNames argTypes (_pre ppDecl)
+      TFunSingle _ iInfered ppInfered <- matchBody funBody argTypes argCs
+      guard $ iDecl == iInfered
+      checkPreWeaker  ppDecl ppInfered
+      checkPostWeaker ppInfered ppDecl
       -- TODO clean constraints
-      return declared
+      return decl
         where
-        checkPreWeaker  :: TFunSingle -> TFunSingle -> CM ()
-        checkPreWeaker  = checkWeaker `on` _pre  . funPP
-        checkPostWeaker :: TFunSingle -> TFunSingle -> CM ()
-        checkPostWeaker = checkWeaker `on` _post . funPP
+        checkPreWeaker  :: PrePost -> PrePost -> CM ()
+        checkPreWeaker  = checkWeaker `on` _pre
+        checkPostWeaker :: PrePost -> PrePost -> CM ()
+        checkPostWeaker = checkWeaker `on` _post
 
     inferSignature :: [IVar] -> Defs -> CM TFunSingle
     inferSignature argNames funBody = do
       let argTypes = fmap (\n -> "A"++n) argNames
-      let argsPP = argsPPfromTypes argNames argTypes
-      matchBody funBody argTypes argsPP
+      let argCs = addArgsCs argNames argTypes emptyConstraints
+      matchBody funBody argTypes argCs
 
-    matchBody :: Defs -> [IType] -> PrePost -> CM TFunSingle
-    matchBody funBody argTypes argsPP = do
-      (funReturnId, funBodyPP) <- matchBlock funBody argsPP
+    matchBody :: Defs -> [IType] -> Constraints -> CM TFunSingle
+    matchBody funBody argTypes argCs = do
+      (funReturnId, funBodyPP) <- matchBlock funBody argCs
       checkEmptyPreEnv funBodyPP
       let funBodyNoEnvPP = eraseEnv funBodyPP
       -- TODO clean constraints
@@ -222,15 +211,18 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
         eraseEnv' :: Constraints -> Constraints
         eraseEnv' = Map.delete env
 
+addArgsPP :: [IAttr] -> [IType] -> PrePost -> PrePost
+addArgsPP argNames argTypes (PrePost pre post) =
+  PrePost
+    (addArgsCs argNames argTypes pre)
+    (addArgsCs argNames argTypes post)
 
-    argsPPfromTypes argNames argTypes =
-      let argsEnvRec = Map.fromList $ zip argNames (requiredList argTypes) in 
-          postFromTRec env argsEnvRec
+addArgsCs :: [IVar] -> [IType] -> Constraints -> Constraints
+addArgsCs argNames argTypes = Map.insert env (argsTOr argNames argTypes)
 
-    postFromTRec :: IType -> TRec -> PrePost
-    postFromTRec env argsEnvRec =
-      PrePost emptyConstraints
-              (singletonConstraint env $ tOrFromTRec argsEnvRec)
+argsTOr :: [IVar] -> [IType] -> TOr
+argsTOr argNames argTypes = tOrFromTRec $ Map.fromList $ zip argNames (requiredList argTypes)
+
 
 postPointerPrimitive :: Kind -> CM Type
 postPointerPrimitive kind = postPointer $ tOrPrimitive kind
@@ -269,4 +261,4 @@ requiredList = fmap required
 --   merge
 --   guard $ t1 = rename t2
 --   return (t1, mergedPP)
-
+--

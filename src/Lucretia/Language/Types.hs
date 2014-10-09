@@ -166,6 +166,9 @@ tOrFromTSingle tSingle = Map.singleton (kind tSingle) tSingle
 tOrFromTRec :: TRec -> TOr
 tOrFromTRec = tOrFromTSingle . TRec
 
+tOrFromTFun :: TFunSingle -> TOr
+tOrFromTFun = tOrFromTSingle . TFun
+
 tOrFromTFunSingle :: TFunSingle -> TOr
 tOrFromTFunSingle = tOrFromTSingle . TFun
 

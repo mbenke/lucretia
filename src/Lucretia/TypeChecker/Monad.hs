@@ -41,5 +41,5 @@ freshIType = do
 -- ** Backtracking and errors (not in wp)
 
 -- | For now error messages are ignored, since backtracking is handled by a 'List' monad and error is signalled there as a lack of a result in a list of results.
-error :: String -> CM ()
+error :: String -> CM a
 error _ = mzero

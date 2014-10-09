@@ -72,7 +72,7 @@ instance Weaker (Maybe TSingle) where
       then Just $ TRec difference
       else Nothing
     where difference = s' `Map.difference` s
-  w Nothing         (Just (TRec s')) = return Nothing
+  w Nothing _ = return Nothing
   -- cannot be otherwise since:
   -- * types in "m :: TOr" are subset of types in "m' :: TOr": Set.isSubsetOf `on` Map.keys $ m m'
   -- * "w" on "Maybe TSingle" parameters are TRecs: rec <- (w `on` Map.lookup KRec) m m'

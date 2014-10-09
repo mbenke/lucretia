@@ -28,7 +28,7 @@ typeProgramme b = evalCM (typeProgrammeM b) initState
 
 typeProgrammeM :: Defs -> CM (IType, Constraints)
 typeProgrammeM b = do
-  (id, PrePost pre post) <- matchBlock b emptyPrePost
+  (id, PrePost pre post) <- matchBlock b emptyConstraints
   expectEmptyPreconditionsIn pre
   return (id, post)
 

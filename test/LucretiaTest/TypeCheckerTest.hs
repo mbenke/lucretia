@@ -56,11 +56,16 @@ outputTypeTestsData =
   , ($(nv 'bSetAttr_xa__Set_xa_to_yb__Set_xa__Get_yb), "Y with Constraints: [A < {b: Y}, E < string, Env < {x: X, y: A}, X < {a: E}, Y < int]")
   , ($(nv 'bSetAttr_xa__Set_x_to_y__Set_xa__Get_ya), "Z with Constraints: [Env < {x: X, y: X}, X < {a: Z}, Z < int]")
   , ($(nv 'bFun_identity), "Y with Constraints: [Env < {identity: Y}, Y < func (Ax) [] -> Ax []]")
-  , ($(nv 'bFun_identity_setFields), "C with Constraints: [C < func (Ar, Ax, Ay) [Ar < {}] -> Ar [Ar < {a: Ax, b: Ay}], Env < {identity: C}]")
+  , ($(nv 'bFun_identitySetFields), "C with Constraints: [C < func (Ar, Ax, Ay) [Ar < {}] -> Ar [Ar < {a: Ax, b: Ay}], Env < {identitySetFields: C}]")
   , ($(nv 'bFun_withSignature_identity), "Y with Constraints: [Env < {identity: Y}, Y < func (X) [] -> X []]")
-  , ($(nv 'bFun_withSignature_identity_setFields), "C with Constraints: [C < func (R, X, Y) [R < {}] -> R [R < {a: X, b: Y}], Env < {identity: C}]")
+  , ($(nv 'bFun_withSignature_identitySetFields), "C with Constraints: [C < func (R, X, Y) [R < {}] -> R [R < {a: X, b: Y}], Env < {identitySetFields: C}]")
   , ($(nv 'bFun_withSignature_tooStrongPre), "Programme does not type-check to any type")
   , ($(nv 'bFun_withSignature_tooStrongPost), "Programme does not type-check to any type")
+  , ($(nv 'bFun_identityNested), "Programme does not type-check to any type")
+  , ($(nv 'bFun_withSignature_identityNested), "Y with Constraints: [Env < {identityNested: Y}, Y < func (X, Identity) [Identity < func (X) [] -> X []] -> X [Identity < func (X) [] -> X []]]")
+  , ($(nv 'bCall_identity), "Z with Constraints: [Env < {i: Z, identity: Y}, Y < func (Ax) [] -> Ax [], Z < int]")
+  , ($(nv 'bCall_identitySetFields), "D with Constraints: [C < func (Ar, Ax, Ay) [Ar < {}] -> Ar [Ar < {a: Ax, b: Ay}], D < {a: E, b: F}, E < int, Env < {i: E, identitySetFields: C, s: F, x: D}, F < string]")
+  , ($(nv 'bCall_withSignature_identityNested), "B with Constraints: [A < func (X) [] -> X [], B < int, Env < {i: B, identity: A, identityNested: Y}, Y < func (X, Identity) [Identity < func (X) [] -> X []] -> X [Identity < func (X) [] -> X []]]")
   --, ($(nv '), "C")
   ]
 
@@ -141,28 +146,28 @@ bSetAttr_xa__Set_x_to_y__Set_xa__Get_ya =
   ]
 bFun_identity =
   [ SetVar "identity" $
-    EFunDef ["x"] Nothing $
-    [ Return $ EGetVar "x"
-    ]
+      EFunDef ["x"] Nothing $
+      [ Return $ EGetVar "x"
+      ]
   ]
-bFun_identity_setFields =
-  [ SetVar "identity" $
-    EFunDef ["r", "x", "y"] Nothing $
-    [ SetAttr "r" "a" $ EGetVar "x"
-    , SetAttr "r" "b" $ EGetVar "y"
-    , Return $ EGetVar "r"
-    ]
+bFun_identitySetFields =
+  [ SetVar "identitySetFields" $
+      EFunDef ["r", "x", "y"] Nothing $
+      [ SetAttr "r" "a" $ EGetVar "x"
+      , SetAttr "r" "b" $ EGetVar "y"
+      , Return $ EGetVar "r"
+      ]
   ]
 bFun_withSignature_identity =
   [ SetVar "identity" $
-    EFunDef ["x"]
+      EFunDef ["x"]
       (Just $ TFunSingle ["X"] "X" (PrePost Map.empty Map.empty))
-    [ Return $ EGetVar "x"
-    ]
+      [ Return $ EGetVar "x"
+      ]
   ]
-bFun_withSignature_identity_setFields =
-  [ SetVar "identity" $
-    EFunDef ["r", "x", "y"]
+bFun_withSignature_identitySetFields =
+  [ SetVar "identitySetFields" $
+      EFunDef ["r", "x", "y"]
       (Just $ TFunSingle ["R", "X", "Y"] "R"
         (PrePost
           (Map.fromList [ ("R", tOrEmptyRec)
@@ -173,30 +178,60 @@ bFun_withSignature_identity_setFields =
                         ])
         )
       )
-    [ SetAttr "r" "a" $ EGetVar "x"
-    , SetAttr "r" "b" $ EGetVar "y"
-    , Return $ EGetVar "r"
-    ]
+      [ SetAttr "r" "a" $ EGetVar "x"
+      , SetAttr "r" "b" $ EGetVar "y"
+      , Return $ EGetVar "r"
+      ]
   ]
 bFun_withSignature_tooStrongPre =
   [ SetVar "f" $
-    EFunDef ["x"]
+      EFunDef ["x"]
       (Just $ TFunSingle ["X"] "X" (PrePost Map.empty Map.empty))
-    [ Return $ EGetAttr "x" "a"
-    ]
+      [ Return $ EGetAttr "x" "a"
+      ]
   ]
 bFun_withSignature_tooStrongPost =
   [ SetVar "identity" $
-    EFunDef ["x"]
+      EFunDef ["x"]
       (Just $ TFunSingle ["X"] "X" (PrePost Map.empty (Map.singleton "X" $ tOrSingletonRec "a" "Y")))
-    [ Return $ EGetVar "x"
-    ]
+      [ Return $ EGetVar "x"
+      ]
   ]
-bFun_withSignature_passingFunctionWithoutSignature =
-  [ SetVar "identity_nested" $
-    EFunDef ["x", "identity"]
+bFun_identityNested =
+  [ SetVar "identityNested" $
+      EFunDef ["x", "identity"]
       Nothing
-    [ Return $ EFunCall "identity" ["x"]
-    ]
+      [ Return $ EFunCall "identity" ["x"]
+      ]
+  ]
+bFun_withSignature_identityNested =
+  [ SetVar "identityNested" $
+      EFunDef ["x", "identity"]
+      (Just $ TFunSingle ["X", "Identity"] "X"
+        (PrePost
+          (Map.fromList [ ("Identity", tOrFromTFunSingle $ TFunSingle ["X"] "X" (PrePost Map.empty Map.empty)) ])
+          (Map.fromList [ ("Identity", tOrFromTFunSingle $ TFunSingle ["X"] "X" (PrePost Map.empty Map.empty)) ])
+        )
+      )
+      [ Return $ EFunCall "identity" ["x"]
+      ]
+  ]
+bCall_identity =
+  bFun_identity ++
+  [ SetVar "i" cInt
+  , Return $ EFunCall "identity" ["i"]
+  ]
+bCall_identitySetFields =
+  bFun_identitySetFields ++
+  [ SetVar "x" ENew
+  , SetVar "i" cInt
+  , SetVar "s" cString
+  , Return $ EFunCall "identitySetFields" ["x", "i", "s"]
+  ]
+bCall_withSignature_identityNested =
+  bFun_withSignature_identityNested ++
+  bFun_identity ++
+  [ SetVar "i" cInt
+  , Return $ EFunCall "identityNested" ["i", "identity"]
   ]
 
