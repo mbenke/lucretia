@@ -16,6 +16,7 @@ type Defs = [Def]
 data Def
   = SetVar  IVar       Exp
   | SetAttr IVar IAttr Exp
+  | Return Exp
 
   deriving (Eq, Ord, Show)
 

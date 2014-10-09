@@ -11,6 +11,7 @@ import Control.Monad ( guard )
 import Control.Monad.State ( lift )
 import Data.Map as Map hiding ( update )
 import Data.Set as Set
+import Data.Function ( on )
 
 import Util.Debug
 
@@ -21,7 +22,7 @@ import Lucretia.Language.Types
 import Lucretia.TypeChecker.Monad ( freshIType, CM )
 import Lucretia.TypeChecker.Renaming ( applyRenaming, getRenamingOnEnv, freeVariables )
 import Lucretia.TypeChecker.Update ( update, extend )
-import Lucretia.TypeChecker.Weakening ( weaker )
+import Lucretia.TypeChecker.Weakening ( checkWeaker, weaker )
 
 
 matchBlock :: Defs -> PrePost -> CM Type
@@ -58,6 +59,8 @@ bind ppCall (iDecl, ppDecl) = do
 
 -- All @IType@ variables in the returned @Type@ must be fresh, so there is no risk of @IType@ name clashes when @'bind'ing@ @Type@ of the current @Def@ to the @PrePost@ of the block preceding the @Def@.
 matchDefFresh :: Def -> PrePost -> CM Type
+
+matchDefFresh (Return e) pp = matchExpFresh e pp
 
 matchDefFresh (SetVar x e) pp = do
   (eId, ePP) <- matchExpFresh e pp
@@ -127,12 +130,12 @@ matchExp  ENone      _ = postPointerPrimitive KNone
 matchExp  ENew       _ = postPointer tOrEmptyRec
 
 matchExp (EFunCall f xsCall) ppCall = do
-  TFunSingle tsDecl tDecl <- getFunType f (_post ppCall)
+  TFunSingle tsDecl iDecl ppDecl <- getFunType f (_post ppCall)
   checkArgsLength xsCall tsDecl
-  let tInherited = tDecl -- TODO InheritedPP
+  let ppInherited = ppDecl -- TODO InheritedPP
 
-  let tWithArgs = addArgsToEnv xsCall tsDecl tInherited
-  return tWithArgs
+  let ppWithArgs = addArgsToEnv xsCall tsDecl ppInherited
+  return (iDecl, ppWithArgs)
 
     where
     getFunType :: IVar -> Constraints -> CM TFunSingle
@@ -156,11 +159,11 @@ matchExp (EFunCall f xsCall) ppCall = do
       guard $ length xsCall == length tsDecl
         --("Function "++f++" is applied to "++show (length xsCall)++" arguments, but "++show (length tsDecl)++" arguments should be provided.\n")
 
-    addArgsToEnv :: [IAttr] -> [IType] -> Type -> Type
-    addArgsToEnv xsCall tsDecl tInherited =
+    addArgsToEnv :: [IAttr] -> [IType] -> PrePost -> PrePost
+    addArgsToEnv xsCall tsDecl ppInherited =
       let args = zip xsCall tsDecl in
       let newEnv = recFromPairs args in
-      setEnv newEnv tInherited
+      setEnv newEnv ppInherited
 
     --TODO impl
     --setEnv :: 
@@ -180,23 +183,20 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
 
   where
     checkSignature :: TFunSingle -> CM TFunSingle
-    checkSignature signature@(TFunSingle argTypes (tDecl, ppDecl)) = do
+    checkSignature declared@(TFunSingle argTypes iDecl ppDecl) = do
       let argsPP = argsPPfromTypes argNames argTypes
-      -- add ppDecl to _post argsPP
-      funType <- matchBody funBody argTypes argsPP
-      -- checkEmptyPre funType
-      -- checkPostWeaker funType ppDecl
+          -- add pre_ ppDecl (function signatures) as post
+      infered <- matchBody funBody argTypes argsPP
+      --guard $ iDecl == iInfered
+      checkPreWeaker  declared infered
+      checkPostWeaker infered declared
       -- TODO clean constraints
-      return signature
-
+      return declared
         where
-        checkEmptyPre :: TFunSingle -> CM ()
-        checkEmptyPre (TFunSingle _ (_, PrePost pre _)) =
-          guard $ pre == Map.empty -- not emptyConstraints, because environment was removed in matchBody
-
-        -- checkPostWeaker :: TFunSingle -> PrePost -> CM ()
-        -- checkPostWeaker (TFunSingle _ (_, PrePost _ postActual) (PrePost _ postDecl) =
-      -- check _post funType 
+        checkPreWeaker  :: TFunSingle -> TFunSingle -> CM ()
+        checkPreWeaker  = checkWeaker `on` _pre  . funPP
+        checkPostWeaker :: TFunSingle -> TFunSingle -> CM ()
+        checkPostWeaker = checkWeaker `on` _post . funPP
 
     inferSignature :: [IVar] -> Defs -> CM TFunSingle
     inferSignature argNames funBody = do
@@ -210,7 +210,7 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
       checkEmptyPreEnv funBodyPP
       let funBodyNoEnvPP = eraseEnv funBodyPP
       -- TODO clean constraints
-      return $ TFunSingle argTypes (funReturnId, funBodyNoEnvPP)
+      return $ TFunSingle argTypes funReturnId funBodyNoEnvPP
 
         where
         -- | Checks that no variable was referenced, apart from the arguments

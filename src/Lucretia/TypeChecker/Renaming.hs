@@ -91,12 +91,11 @@ instance ApplyRenaming TSingle where
 instance ApplyRenaming TAttr where
   ar f (definedness, i) = (definedness, f i)
 instance ApplyRenaming TFunSingle where
-  ar f (TFunSingle preTs (postT, ppF)) =
+  ar f (TFunSingle preTs postT ppF) =
     TFunSingle 
       (f `fmap` preTs)
-      ( (f postT)
-      , (ar f ppF)
-      )
+      (f postT)
+      (ar f ppF)
  
 getRenamingOnEnv :: Constraints -> Constraints -> CM Renaming
 getRenamingOnEnv = getRenaming `on` \cs -> (getEnv cs, cs)

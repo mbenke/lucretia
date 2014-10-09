@@ -6,7 +6,7 @@
 -- Weakening rules.
 -----------------------------------------------------------------------------
 {-# LANGUAGE FlexibleInstances, FlexibleContexts, TypeSynonymInstances #-}
-module Lucretia.TypeChecker.Weakening ( weaker ) where
+module Lucretia.TypeChecker.Weakening ( checkWeaker, weaker ) where
 
 import Data.Map ( Map )
 import Data.Map as Map
@@ -23,8 +23,12 @@ import Lucretia.Language.Types
 import Lucretia.TypeChecker.Monad
 
 
-nonEmpty :: Map k v -> Bool
-nonEmpty = not . Map.null
+checkWeaker :: Constraints
+            -> Constraints
+            -> CM ()
+checkWeaker c c' = do
+  toWeaken <- weaker c c'
+  guard $ toWeaken == Map.empty
 
 weaker :: Constraints -- ^ @Constraints@ at the place of call
        -> Constraints -- ^ @Constraints@ at the place of declaration, function preconditions
@@ -73,4 +77,6 @@ instance Weaker (Maybe TSingle) where
   -- * types in "m :: TOr" are subset of types in "m' :: TOr": Set.isSubsetOf `on` Map.keys $ m m'
   -- * "w" on "Maybe TSingle" parameters are TRecs: rec <- (w `on` Map.lookup KRec) m m'
 
+nonEmpty :: Map k v -> Bool
+nonEmpty = not . Map.null
 

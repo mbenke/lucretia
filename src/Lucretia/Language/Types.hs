@@ -80,7 +80,8 @@ type TFun = Maybe TFunSingle
 --data TFun = Maybe TFunOr
 --type TFunOr        = Set TFunSingle
 data TFunSingle  = TFunSingle { funArgs :: [IType]
-                              , funType ::   Type --FunPrePost
+                              , funRet  :: IType
+                              , funPP   :: PrePost
                               }
                  deriving ( Eq, Ord, Show )
 
@@ -235,7 +236,7 @@ showKind (KFun, TFun f) = showFun f
 showKind other          = show other
 
 showFun :: TFunSingle -> String
-showFun (TFunSingle argIds (returnId, (PrePost pre post))) = concat
+showFun (TFunSingle argIds returnId (PrePost pre post)) = concat
   [ "func ("
   , intercalate ", " argIds
   , ") "

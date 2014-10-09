@@ -40,23 +40,28 @@ outputTypeTests = map (uncurry map_to_ATest) outputTypeTestsData
 outputTypeTestsData :: [OutputTestDatum]
 outputTypeTestsData =
   [ ($(nv 'bSetVar_x), "X with Constraints: [Env < {x: X}, X < int]")
-  , ($(nv 'bSetVar_x__Get_x), "X with Constraints: [Env < {_: X, x: X}, X < int]")
+  , ($(nv 'bSetVar_x__Get_x), "X with Constraints: [Env < {x: X}, X < int]")
   , ($(nv 'bSetVar_x_to_x), "X with Constraints: [Env < {x: X}, X < int]")
-  , ($(nv 'bSetVar_xy__Get_y), "Y with Constraints: [Env < {_: Y, x: X, y: Y}, X < int, Y < string]")
+  , ($(nv 'bSetVar_xy__Get_y), "Y with Constraints: [Env < {x: X, y: Y}, X < int, Y < string]")
   , ($(nv 'bGetUndefinedVar), "Programme does not type-check to any type")
-  , ($(nv 'bNew), "X with Constraints: [Env < {_: X}, X < {}]")
+  , ($(nv 'bNew), "X with Constraints: [Env < {}, X < {}]")
   , ($(nv 'bGetAttr_noVar), "Programme does not type-check to any type")
   , ($(nv 'bGetAttr_varNotRec), "Programme does not type-check to any type")
   , ($(nv 'bSetAttr_xa), "Y with Constraints: [Env < {x: X}, X < {a: Y}, Y < int]")
   , ($(nv 'bSetAttr_xab), "A with Constraints: [A < string, Env < {x: X}, X < {a: Y, b: A}, Y < int]")
-  , ($(nv 'bSetAttr_xa__Get_xa), "Y with Constraints: [Env < {_: Y, x: X}, X < {a: Y}, Y < int]")
-  , ($(nv 'bSetAttr_xab__Get_xb), "A with Constraints: [A < string, Env < {_: A, x: X}, X < {a: Y, b: A}, Y < int]")
+  , ($(nv 'bSetAttr_xa__Get_xa), "Y with Constraints: [Env < {x: X}, X < {a: Y}, Y < int]")
+  , ($(nv 'bSetAttr_xab__Get_xb), "A with Constraints: [A < string, Env < {x: X}, X < {a: Y, b: A}, Y < int]")
   , ($(nv 'bSetAttr_xa__Set_xa_to_yb), "Y with Constraints: [A < {b: Y}, Env < {x: X, y: A}, X < {a: Y}, Y < int]")
-  , ($(nv 'bSetAttr_xa__Set_xa_to_yb__Get_yb), "Y with Constraints: [A < {b: Y}, Env < {_: Y, x: X, y: A}, X < {a: Y}, Y < int]")
-  , ($(nv 'bSetAttr_xa__Set_xa_to_yb__Set_xa__Get_yb), "Y with Constraints: [A < {b: Y}, E < string, Env < {_: Y, x: X, y: A}, X < {a: E}, Y < int]")
-  , ($(nv 'bSetAttr_xa__Set_x_to_y__Set_xa__Get_ya), "Z with Constraints: [Env < {_: Z, x: X, y: X}, X < {a: Z}, Z < int]")
+  , ($(nv 'bSetAttr_xa__Set_xa_to_yb__Get_yb), "Y with Constraints: [A < {b: Y}, Env < {x: X, y: A}, X < {a: Y}, Y < int]")
+  , ($(nv 'bSetAttr_xa__Set_xa_to_yb__Set_xa__Get_yb), "Y with Constraints: [A < {b: Y}, E < string, Env < {x: X, y: A}, X < {a: E}, Y < int]")
+  , ($(nv 'bSetAttr_xa__Set_x_to_y__Set_xa__Get_ya), "Z with Constraints: [Env < {x: X, y: X}, X < {a: Z}, Z < int]")
   , ($(nv 'bFun_identity), "Y with Constraints: [Env < {identity: Y}, Y < func (Ax) [] -> Ax []]")
-  , ($(nv 'bFun_identity_setFields), "C with Constraints: [C < func (Ax, Ay, Az) [Ax < {}] -> Ax [Ax < {a: Ay, b: Az}], Env < {identity: C}]")
+  , ($(nv 'bFun_identity_setFields), "C with Constraints: [C < func (Ar, Ax, Ay) [Ar < {}] -> Ar [Ar < {a: Ax, b: Ay}], Env < {identity: C}]")
+  , ($(nv 'bFun_withSignature_identity), "Y with Constraints: [Env < {identity: Y}, Y < func (X) [] -> X []]")
+  , ($(nv 'bFun_withSignature_identity_setFields), "C with Constraints: [C < func (R, X, Y) [R < {}] -> R [R < {a: X, b: Y}], Env < {identity: C}]")
+  , ($(nv 'bFun_withSignature_tooStrongPre), "Programme does not type-check to any type")
+  , ($(nv 'bFun_withSignature_tooStrongPost), "Programme does not type-check to any type")
+  --, ($(nv '), "C")
   ]
 
 --bSetVar_x, bSetVar_xGet_x, bSetVar_xyGet_y, bGetUndefinedVar, bNew :: Defs
@@ -69,7 +74,7 @@ bSetVar_x =
   ]
 bSetVar_x__Get_x =
   [ SetVar "x" cInt
-  , SetVar "_" $ EGetVar "x"
+  , Return $ EGetVar "x"
   ]
 bSetVar_x_to_x =
   [ SetVar "x" cInt
@@ -78,20 +83,20 @@ bSetVar_x_to_x =
 bSetVar_xy__Get_y =
   [ SetVar "x" cInt
   , SetVar "y" cString
-  , SetVar "_" $ EGetVar "y"
+  , Return $ EGetVar "y"
   ]
 bGetUndefinedVar = 
-  [ SetVar "_" $ EGetVar "x"
+  [ Return $ EGetVar "x"
   ]
 bNew =
-  [ SetVar "_" ENew
+  [ Return ENew
   ]
 bGetAttr_noVar =
-  [ SetVar "_" $ EGetAttr "x" "a"
+  [ Return $ EGetAttr "x" "a"
   ]
 bGetAttr_varNotRec =
   [ SetVar "x" cInt
-  , SetVar "_" $ EGetAttr "x" "a"
+  , Return $ EGetAttr "x" "a"
   ]
 bSetAttr_xa =
   [ SetVar "x" ENew
@@ -105,13 +110,13 @@ bSetAttr_xab =
 bSetAttr_xa__Get_xa =
   [ SetVar "x" ENew
   , SetAttr "x" "a" cInt
-  , SetVar "_" $ EGetAttr "x" "a"
+  , Return $ EGetAttr "x" "a"
   ]
 bSetAttr_xab__Get_xb =
   [ SetVar "x" ENew
   , SetAttr "x" "a" cInt
   , SetAttr "x" "b" cString
-  , SetVar "_" $ EGetAttr "x" "b"
+  , Return $ EGetAttr "x" "b"
   ]
 bSetAttr_xa__Set_xa_to_yb =
   [ SetVar "x" ENew
@@ -121,31 +126,77 @@ bSetAttr_xa__Set_xa_to_yb =
   ]
 bSetAttr_xa__Set_xa_to_yb__Get_yb =
   bSetAttr_xa__Set_xa_to_yb ++
-  [ SetVar "_" $ EGetAttr "y" "b"
+  [ Return $ EGetAttr "y" "b"
   ]
 bSetAttr_xa__Set_xa_to_yb__Set_xa__Get_yb =
   bSetAttr_xa__Set_xa_to_yb ++
   [ SetAttr "x" "a" cString
-  , SetVar "_" $ EGetAttr "y" "b"
+  , Return $ EGetAttr "y" "b"
   ]
 bSetAttr_xa__Set_x_to_y__Set_xa__Get_ya =
   [ SetVar "x" ENew
   , SetVar "y" $ EGetVar "x"
   , SetAttr "x" "a" cInt
-  , SetVar "_" $ EGetAttr "y" "a"
+  , Return $ EGetAttr "y" "a"
   ]
 bFun_identity =
   [ SetVar "identity" $
     EFunDef ["x"] Nothing $
-    [ SetVar "_" $ EGetVar "x"
+    [ Return $ EGetVar "x"
     ]
   ]
 bFun_identity_setFields =
   [ SetVar "identity" $
-    EFunDef ["x", "y", "z"] Nothing $
-    [ SetAttr "x" "a" $ EGetVar "y"
-    , SetAttr "x" "b" $ EGetVar "z"
-    , SetVar "_" $ EGetVar "x"
+    EFunDef ["r", "x", "y"] Nothing $
+    [ SetAttr "r" "a" $ EGetVar "x"
+    , SetAttr "r" "b" $ EGetVar "y"
+    , Return $ EGetVar "r"
+    ]
+  ]
+bFun_withSignature_identity =
+  [ SetVar "identity" $
+    EFunDef ["x"]
+      (Just $ TFunSingle ["X"] "X" (PrePost Map.empty Map.empty))
+    [ Return $ EGetVar "x"
+    ]
+  ]
+bFun_withSignature_identity_setFields =
+  [ SetVar "identity" $
+    EFunDef ["r", "x", "y"]
+      (Just $ TFunSingle ["R", "X", "Y"] "R"
+        (PrePost
+          (Map.fromList [ ("R", tOrEmptyRec)
+                        ])
+          (Map.fromList [ ("R", tOrFromTRec $ Map.fromList [ ("a", (Required, "X"))
+                                                           , ("b", (Required, "Y"))
+                                                           ])
+                        ])
+        )
+      )
+    [ SetAttr "r" "a" $ EGetVar "x"
+    , SetAttr "r" "b" $ EGetVar "y"
+    , Return $ EGetVar "r"
+    ]
+  ]
+bFun_withSignature_tooStrongPre =
+  [ SetVar "f" $
+    EFunDef ["x"]
+      (Just $ TFunSingle ["X"] "X" (PrePost Map.empty Map.empty))
+    [ Return $ EGetAttr "x" "a"
+    ]
+  ]
+bFun_withSignature_tooStrongPost =
+  [ SetVar "identity" $
+    EFunDef ["x"]
+      (Just $ TFunSingle ["X"] "X" (PrePost Map.empty (Map.singleton "X" $ tOrSingletonRec "a" "Y")))
+    [ Return $ EGetVar "x"
+    ]
+  ]
+bFun_withSignature_passingFunctionWithoutSignature =
+  [ SetVar "identity_nested" $
+    EFunDef ["x", "identity"]
+      Nothing
+    [ Return $ EFunCall "identity" ["x"]
     ]
   ]
 
