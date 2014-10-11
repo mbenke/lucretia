@@ -81,11 +81,12 @@ type TFun = Maybe TFunSingle
 --type TFunOr        = Set TFunSingle
 data TFunSingle  = TFunSingle { funArgs :: [IType]
                               , funRet  :: IType
-                              , funPP   :: PrePost
+                              , funPP   :: FunPrePost
                               }
                  deriving ( Eq, Ord, Show )
 
-data FunPrePost = InheritedPP | DeclaredPP PrePost
+data FunPrePost  = InheritedPP | DeclaredPP PrePost
+                 deriving ( Eq, Ord, Show )
 
 -- * Constraints (@Psi@ in wp)
 
@@ -239,16 +240,20 @@ showKind (KFun, TFun f) = showFun f
 showKind other          = show other
 
 showFun :: TFunSingle -> String
-showFun (TFunSingle argIds returnId (PrePost pre post)) = concat
+showFun (TFunSingle argIds returnId funPP) = concat
   [ "func ("
   , intercalate ", " argIds
   , ") "
-  , showConstraints pre
+  , showFunPP _pre  funPP
   , " -> "
   , returnId
   , " "
-  , showConstraints post
+  , showFunPP _post funPP
   ]
+
+showFunPP :: (PrePost -> Constraints) -> FunPrePost -> String
+showFunPP _ InheritedPP = ""
+showFunPP which (DeclaredPP pp) = showConstraints $ which pp
 
 showRec :: TRec -> String
 showRec r = concat ["{", showFields r, "}"]

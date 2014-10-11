@@ -5,6 +5,8 @@
 --
 -- TypeChecker rules
 -----------------------------------------------------------------------------
+{-# LANGUAGE TemplateHaskell, FlexibleInstances, FlexibleContexts #-}
+
 module Lucretia.TypeChecker.Rules ( matchBlock ) where
 
 import Prelude hiding ( error )
@@ -21,6 +23,7 @@ import Lucretia.Language.Syntax
 import Lucretia.Language.Types
 
 import Lucretia.TypeChecker.Monad ( error, freshIType, CM )
+import Lucretia.TypeChecker.Monad ( freshIType, CM )
 import Lucretia.TypeChecker.Renaming ( applyRenaming, getRenamingOnEnv, freeVariables )
 import Lucretia.TypeChecker.Update ( update, extend )
 import Lucretia.TypeChecker.Weakening ( checkWeaker, weaker )
@@ -131,9 +134,13 @@ matchExp  ENone      _ = postPointerPrimitive KNone
 matchExp  ENew       _ = postPointer tOrEmptyRec
 
 matchExp (EFunCall f xsCall) ppCall = do
-  TFunSingle tsDecl iDecl ppDecl <- getFunType f (_post ppCall)
+  -- Pre- & post- constraints must be declared in the code.
+  -- In case of other function signatures, InheritedPP should be
+  -- replaced in matchExp (EFunDef ...).
+  TFunSingle tsDecl iDecl (DeclaredPP ppDecl) <- getFunType f (_post ppCall)
   checkArgsLength xsCall tsDecl
-  let ppInherited = ppDecl -- TODO InheritedPP
+  let ppInherited = inheritPP ppDecl
+      -- Q how it should work
 
   let ppWithArgs = addArgsPP xsCall tsDecl ppInherited
   return (iDecl, ppWithArgs)
@@ -170,22 +177,29 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
 
   where
     checkSignature :: TFunSingle -> CM TFunSingle
-    checkSignature decl@(TFunSingle argTypes iDecl ppDecl) = do
-      -- We are adding pre-constraints from the function signature
-      -- to make available at the call site the signatures
-      -- of the functions passed as parameters
-      let argCs = addArgsCs argNames argTypes (_pre ppDecl)
-      TFunSingle _ iInfered ppInfered <- matchBody funBody argTypes argCs
-      guard $ iDecl == iInfered
-      checkPreWeaker  ppDecl ppInfered
-      checkPostWeaker ppInfered ppDecl
-      -- TODO clean constraints
-      return decl
-        where
-        checkPreWeaker  :: PrePost -> PrePost -> CM ()
-        checkPreWeaker  = checkWeaker `on` _pre
-        checkPostWeaker :: PrePost -> PrePost -> CM ()
-        checkPostWeaker = checkWeaker `on` _post
+    checkSignature decl@(TFunSingle argTypes iDecl (DeclaredPP ppDecl)) = do
+      -- pre- & post- constraints must be declared in the code
+      -- that should be checked by Lucretia parser
+      -- case maybePPDecl of
+      --   InheritedPP -> error $ "Containig function must declare pre- and post-constraints."
+      --   DeclaredPP ppDecl ->
+      --     do
+        let ppInherited = ppDecl
+        -- We are adding pre-constraints from the function signature
+        -- to make available at the call site the signatures
+        -- of the functions passed as parameters
+        let argCs = addArgsCs argNames argTypes (_pre ppInherited)
+        TFunSingle _ iInfered (DeclaredPP ppInfered) <- matchBody funBody argTypes argCs
+        guard $ iDecl == iInfered
+        checkPreWeaker  ppInherited ppInfered
+        checkPostWeaker ppInfered ppInherited
+        -- TODO clean constraints
+        return decl
+          where
+          checkPreWeaker  :: PrePost -> PrePost -> CM ()
+          checkPreWeaker  = checkWeaker `on` _pre
+          checkPostWeaker :: PrePost -> PrePost -> CM ()
+          checkPostWeaker = checkWeaker `on` _post
 
     inferSignature :: [IVar] -> Defs -> CM TFunSingle
     inferSignature argNames funBody = do
@@ -199,7 +213,7 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
       checkEmptyPreEnv funBodyPP
       let funBodyNoEnvPP = eraseEnv funBodyPP
       -- TODO clean constraints
-      return $ TFunSingle argTypes funReturnId funBodyNoEnvPP
+      return $ TFunSingle argTypes funReturnId (DeclaredPP funBodyNoEnvPP)
 
         where
         -- | Checks that no variable was referenced, apart from the arguments
@@ -235,6 +249,25 @@ required i = (Required, i)
 
 requiredList :: [IType] -> [TAttr]
 requiredList = fmap required
+
+inheritPP :: PrePost -> PrePost
+inheritPP pp = inherit pp pp
+class InheritPP a where
+  inherit :: PrePost -> a -> a
+instance InheritPP PrePost where
+  inherit pp (PrePost pre post) = PrePost (inherit pp pre) (inherit pp post)
+instance InheritPP Constraints where
+  inherit pp = Map.map $ inherit pp
+instance InheritPP TOr where
+  inherit pp = Map.map $ inherit pp
+instance InheritPP TSingle where
+  inherit pp (TFun tfun) = TFun $ inherit pp tfun
+  inherit pp other = other
+instance InheritPP TFunSingle where
+  inherit pp (TFunSingle funArgs funRet funPP) = TFunSingle funArgs funRet $ inherit pp funPP
+instance InheritPP FunPrePost where
+  inherit pp InheritedPP = DeclaredPP pp
+  inherit pp other = other
 
 
 -- 

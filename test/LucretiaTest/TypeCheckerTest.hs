@@ -66,6 +66,8 @@ outputTypeTestsData =
   , ($(nv 'bCall_identity), "Z with Constraints: [Env < {i: Z, identity: Y}, Y < func (Ax) [] -> Ax [], Z < int]")
   , ($(nv 'bCall_identitySetFields), "D with Constraints: [C < func (Ar, Ax, Ay) [Ar < {}] -> Ar [Ar < {a: Ax, b: Ay}], D < {a: E, b: F}, E < int, Env < {i: E, identitySetFields: C, s: F, x: D}, F < string]")
   , ($(nv 'bCall_withSignature_identityNested), "B with Constraints: [A < func (X) [] -> X [], B < int, Env < {i: B, identity: A, identityNested: Y}, Y < func (X, Identity) [Identity < func (X) [] -> X []] -> X [Identity < func (X) [] -> X []]]")
+  --, ($(nv 'bFun_recursive), "a")
+  --, ($(nv 'bCall_recursive), "")
   --, ($(nv '), "C")
   ]
 
@@ -161,7 +163,7 @@ bFun_identitySetFields =
 bFun_withSignature_identity =
   [ SetVar "identity" $
       EFunDef ["x"]
-      (Just $ TFunSingle ["X"] "X" (PrePost Map.empty Map.empty))
+      (Just $ TFunSingle ["X"] "X" (DeclaredPP $ PrePost Map.empty Map.empty))
       [ Return $ EGetVar "x"
       ]
   ]
@@ -169,7 +171,7 @@ bFun_withSignature_identitySetFields =
   [ SetVar "identitySetFields" $
       EFunDef ["r", "x", "y"]
       (Just $ TFunSingle ["R", "X", "Y"] "R"
-        (PrePost
+        (DeclaredPP $ PrePost
           (Map.fromList [ ("R", tOrEmptyRec)
                         ])
           (Map.fromList [ ("R", tOrFromTRec $ Map.fromList [ ("a", (Required, "X"))
@@ -186,14 +188,14 @@ bFun_withSignature_identitySetFields =
 bFun_withSignature_tooStrongPre =
   [ SetVar "f" $
       EFunDef ["x"]
-      (Just $ TFunSingle ["X"] "X" (PrePost Map.empty Map.empty))
+      (Just $ TFunSingle ["X"] "X" (DeclaredPP $ PrePost Map.empty Map.empty))
       [ Return $ EGetAttr "x" "a"
       ]
   ]
 bFun_withSignature_tooStrongPost =
   [ SetVar "identity" $
       EFunDef ["x"]
-      (Just $ TFunSingle ["X"] "X" (PrePost Map.empty (Map.singleton "X" $ tOrSingletonRec "a" "Y")))
+      (Just $ TFunSingle ["X"] "X" (DeclaredPP $ PrePost Map.empty (Map.singleton "X" $ tOrSingletonRec "a" "Y")))
       [ Return $ EGetVar "x"
       ]
   ]
@@ -208,9 +210,9 @@ bFun_withSignature_identityNested =
   [ SetVar "identityNested" $
       EFunDef ["x", "identity"]
       (Just $ TFunSingle ["X", "Identity"] "X"
-        (PrePost
-          (Map.fromList [ ("Identity", tOrFromTFunSingle $ TFunSingle ["X"] "X" (PrePost Map.empty Map.empty)) ])
-          (Map.fromList [ ("Identity", tOrFromTFunSingle $ TFunSingle ["X"] "X" (PrePost Map.empty Map.empty)) ])
+        (DeclaredPP $ PrePost
+          (Map.fromList [ ("Identity", tOrFromTFunSingle $ TFunSingle ["X"] "X" (DeclaredPP $ PrePost Map.empty Map.empty)) ])
+          (Map.fromList [ ("Identity", tOrFromTFunSingle $ TFunSingle ["X"] "X" (DeclaredPP $ PrePost Map.empty Map.empty)) ])
         )
       )
       [ Return $ EFunCall "identity" ["x"]
@@ -233,5 +235,20 @@ bCall_withSignature_identityNested =
   bFun_identity ++
   [ SetVar "i" cInt
   , Return $ EFunCall "identityNested" ["i", "identity"]
+  ]
+preRecursive = Map.fromList
+  [ ("F", tOrFromTFunSingle $ TFunSingle ["F"] "I" InheritedPP)
+  ]
+postRecursive = Map.fromList
+  [ ("F", tOrFromTFunSingle $ TFunSingle ["F"] "I" InheritedPP)
+  , ("I", tOrPrimitive KInt)
+  ]
+bFun_recursive =
+  [ SetVar "f" $ EFunDef ["f"]
+    (Just $ TFunSingle ["F"] "I"
+      (DeclaredPP $ PrePost preRecursive postRecursive)
+    )
+    [ Return $ EFunCall "f" ["f"]
+    ]
   ]
 

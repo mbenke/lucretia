@@ -20,7 +20,7 @@ import Data.Foldable ( any, Foldable )
 import Data.Function ( on )
 import Data.Tuple ( swap )
 
-import Control.Monad ( guard, mzero )
+import Control.Monad ( guard )
 import Control.Monad.State ( execStateT, get, lift, modify, StateT )
 import Control.Monad.Trans.Reader ( asks, ReaderT, runReaderT )
 import Data.Traversable ( sequence )
@@ -36,6 +36,9 @@ import Lucretia.TypeChecker.Monad ( CM )
 -- | Get all free occuring variables.
 class FreeVariables a where
   freeVariables :: a -> Set IType
+instance FreeVariables FunPrePost where
+  freeVariables (DeclaredPP pp) = freeVariables pp
+  freeVariables InheritedPP = Set.empty
 instance FreeVariables PrePost where
   freeVariables (PrePost pre post) = (Set.union `on` freeVariables) pre post
 instance FreeVariables Constraints where
@@ -75,6 +78,9 @@ instance ApplyRenaming Type where
   ar f (i, pp) = (f i, ar f pp)
 instance ApplyRenaming IType where
   ar f = f
+instance ApplyRenaming FunPrePost where
+  ar f (DeclaredPP pp) = DeclaredPP $ ar f pp
+  ar f InheritedPP = InheritedPP
 instance ApplyRenaming PrePost where
   ar f (PrePost pre post) =
     PrePost
