@@ -8,9 +8,10 @@
 --module Lucretia.TypeChecker where
 module Lucretia.TypeChecker ( typeProgramme ) where
 
-import Control.Monad ( guard )
 import Control.Monad.State ( lift )
 import Data.Map as Map hiding ( update )
+
+import Util.OrFail ( orFail )
 
 import Lucretia.Language.Definitions
 import Lucretia.Language.Syntax
@@ -24,7 +25,7 @@ import Lucretia.TypeChecker.Weakening ( weaker )
 
 
 typeProgramme :: Defs -> ProgrammeType
-typeProgramme b = evalCM (typeProgrammeM b) initState 
+typeProgramme b = evalCM (typeProgrammeM b)
 
 typeProgrammeM :: Defs -> CM (IType, Constraints)
 typeProgrammeM b = do
@@ -33,5 +34,5 @@ typeProgrammeM b = do
   return (id, post)
 
     where expectEmptyPreconditionsIn pre =
-            guard $ pre == emptyConstraints
+            (pre == emptyConstraints) `orFail` "Inside the main programme body a variable was referenced which was not defined."
 

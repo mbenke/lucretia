@@ -10,13 +10,12 @@
 module Lucretia.TypeChecker.Rules ( matchBlock ) where
 
 import Prelude hiding ( error )
-import Control.Monad ( guard )
 import Control.Monad.State ( lift )
 import Data.Map as Map hiding ( update )
 import Data.Set as Set
 import Data.Function ( on )
 
-import Util.Debug
+import Util.OrFail ( orFail )
 
 import Lucretia.Language.Definitions
 import Lucretia.Language.Syntax
@@ -164,8 +163,8 @@ matchExp (EFunCall f xsCall) ppCall = do
     -- | Check length of arguments,
     -- should be the same in the declaration and the place of call
     checkArgsLength xsCall tsDecl =
-      guard $ length xsCall == length tsDecl
-        --("Function "++f++" is applied to "++show (length xsCall)++" arguments, but "++show (length tsDecl)++" arguments should be provided.\n")
+      (length xsCall == length tsDecl) `orFail`
+        ("Function "++f++" is applied to "++show (length xsCall)++" argument(s), but "++show (length tsDecl)++" argument(s) should be provided.\n")
 
 
 -- TODO implement TFunOr
@@ -190,7 +189,8 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
         -- of the functions passed as parameters
         let argCs = addArgsCs argNames argTypes (_pre ppInherited)
         TFunSingle _ iInfered (DeclaredPP ppInfered) <- matchBody funBody argTypes argCs
-        guard $ iDecl == iInfered
+        (iDecl == iInfered) `orFail`
+          ("Returned type of a function is declared "++iDecl++" but it is "++iInfered)
         checkPreWeaker  ppInherited ppInfered
         checkPostWeaker ppInfered ppInherited
         -- TODO clean constraints
@@ -218,7 +218,7 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
         where
         -- | Checks that no variable was referenced, apart from the arguments
         checkEmptyPreEnv :: PrePost -> CM ()
-        checkEmptyPreEnv pp = guard $ getEnv (_pre pp) == emptyRec
+        checkEmptyPreEnv pp = (getEnv (_pre pp) == emptyRec) `orFail` "Inside a function body a variable was referenced which was not defined and is not in the function's parameters."
 
         eraseEnv :: PrePost -> PrePost
         eraseEnv (PrePost pre post) = PrePost (eraseEnv' pre) (eraseEnv' post)

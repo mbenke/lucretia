@@ -9,14 +9,15 @@
 -----------------------------------------------------------------------------
 module Lucretia.TypeChecker.Monad where
 
-import Lucretia.Language.Definitions ( IType )
+import Lucretia.Language.Definitions ( IType, ErrorMsg )
 import Control.Monad.State ( evalStateT, get, mzero, put, StateT )
+import Control.Monad.Error ( runErrorT, throwError, ErrorT )
+import Control.Monad.Identity ( runIdentity, Identity )
 
+type CM = StateT CheckState (ErrorT ErrorMsg Identity)
 
-type CM a = StateT CheckState [] a
-
-evalCM :: CM a -> CheckState -> [a]
-evalCM = evalStateT
+evalCM :: CM a -> Either ErrorMsg a
+evalCM m = runIdentity $ runErrorT $ evalStateT m initState
 
 
 -- ** Fresh variables (not in wp)
@@ -38,8 +39,6 @@ freshIType = do
   put next
   return current
 
--- ** Backtracking and errors (not in wp)
-
--- | For now error messages are ignored, since backtracking is handled by a 'List' monad and error is signalled there as a lack of a result in a list of results.
 error :: String -> CM a
-error _ = mzero
+error = throwError
+

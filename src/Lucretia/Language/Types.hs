@@ -15,7 +15,7 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-import Util.Debug
+import Util.OrFail ( orFail )
 
 import Lucretia.Language.Definitions
 
@@ -37,7 +37,7 @@ import Util.MapLenses (mapInsertLens)
 -- * Language.Types (/Defition 2.1 (Language.Types)/ in wp)
 -- in one sentence: IAttr ~> TAttr = (Definedness, IType) ~> TOr = Map Kind TSingle
 
-type ProgrammeType = [(IType, Constraints)]
+type ProgrammeType = Either ErrorMsg (IType, Constraints)
 
 type Type = (IType, PrePost)
 
@@ -205,10 +205,8 @@ kind (TFun _) = KFun
 -- * Show instance
 
 showProgrammeType :: ProgrammeType -> String
-showProgrammeType [] = "Programme does not type-check to any type"
-showProgrammeType ts = intercalate " AND " $ map showSingleType ts
-  where
-  showSingleType (i, cs) = i++" with Constraints: "++showConstraints cs
+showProgrammeType (Left msg) = "Error: "++msg
+showProgrammeType (Right (i, cs)) = i++" with Constraints: "++showConstraints cs
 
 showType :: Type -> String
 showType (i, pp) = i++", "++showPrePost pp

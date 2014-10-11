@@ -20,12 +20,14 @@ import Data.Foldable ( any, Foldable )
 import Data.Function ( on )
 import Data.Tuple ( swap )
 
-import Control.Monad ( guard )
+import Control.Monad.Error ( runErrorT, throwError, ErrorT )
+import Control.Monad.Identity ( runIdentity, Identity )
 import Control.Monad.State ( execStateT, get, lift, modify, StateT )
 import Control.Monad.Trans.Reader ( asks, ReaderT, runReaderT )
 import Data.Traversable ( sequence )
 
 import Util.Map ( findAll )
+import Util.OrFail ( orFail )
 
 import Lucretia.Language.Definitions
 import Lucretia.Language.Syntax
@@ -112,19 +114,15 @@ class GetRenaming a where
   getRenaming :: (a, Constraints) -- ^ @a@ at the place of call
               -> (a, Constraints) -- ^ @a@ at the place of declaration
               -> CM Renaming       -- ^ Possible renamings
-  al `getRenaming` ed = lift $ run al ed
+  (a, cs) `getRenaming` (a', cs') = lift $ execStateT (runReaderT (r a a') (cs, cs')) emptyRenaming
+
     where
-    run :: GetRenaming a
-        => (a, Constraints)
-        -> (a, Constraints)
-        -> [Renaming]
-    run (a, cs) (a', cs') = execStateT (runReaderT (r a a') (cs, cs')) emptyRenaming
     emptyRenaming = Set.empty
 
   r :: a -- ^ Get renaming to this …
     -> a -- ^ … from that.
     -> M ()
-type M = ReaderT Environment (StateT Renaming [])
+type M = ReaderT Environment (StateT Renaming (ErrorT ErrorMsg Identity))
 type Environment = (Constraints, Constraints)
 
 ok = return ()
@@ -147,7 +145,9 @@ instance GetRenaming IType where
 
       checkRecursively i i' = do
         visited <- getVisited
-        guard $ (i, i') `neitherMemberOf` visited
+        ((i, i') `neitherMemberOf` visited) `orFail`
+          ("There is already a renaming to "++i++" or from "++i')
+
         modify $ Set.insert (i, i')
         t  <- getITypeFromConstraints i  fst
         t' <- getITypeFromConstraints i' snd

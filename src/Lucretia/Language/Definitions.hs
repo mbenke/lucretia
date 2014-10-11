@@ -5,7 +5,7 @@
 --
 -- Basic definitions.
 -----------------------------------------------------------------------------
-module Lucretia.Language.Definitions (IRec, IVar, IAttr, IType) where
+module Lucretia.Language.Definitions (IRec, IVar, IAttr, IType, ErrorMsg) where
 
 type Identifier = String
 
@@ -13,4 +13,6 @@ type IRec  = Identifier
 type IVar  = Identifier
 type IAttr = Identifier
 type IType = Identifier
+
+type ErrorMsg = String
 

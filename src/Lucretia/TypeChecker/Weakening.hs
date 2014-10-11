@@ -15,8 +15,9 @@ import Data.Set as Set
 import Data.Function ( on )
 
 import Prelude hiding ( sequence )
-import Control.Monad ( guard )
 import Data.Traversable ( sequence )
+
+import Util.OrFail ( orFail )
 
 import Lucretia.Language.Definitions
 import Lucretia.Language.Types
@@ -28,7 +29,9 @@ checkWeaker :: Constraints
             -> CM ()
 checkWeaker c c' = do
   toWeaken <- weaker c c'
-  guard $ toWeaken == Map.empty
+  (toWeaken == Map.empty) `orFail`
+    ("Constraints: "++showConstraints c++" should be weaker or equal to "++showConstraints c')
+
 
 weaker :: Constraints -- ^ @Constraints@ at the place of call
        -> Constraints -- ^ @Constraints@ at the place of declaration, function preconditions
@@ -58,7 +61,8 @@ instance Weaker Constraints where
 
 instance Weaker TOr where
   w m m' = do
-    guard $ (Set.isSubsetOf `on` Map.keysSet) m m'
+    (Set.isSubsetOf `on` Map.keysSet) m m' `orFail`
+      ("Type: "++showTOr m++" should be weaker (have less possible types) then: "++showTOr m')
     rec <- (w `on` Map.lookup KRec) m m'
     return $ mapFromMaybe KRec rec
 
