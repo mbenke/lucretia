@@ -183,14 +183,14 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
       --   InheritedPP -> error $ "Containig function must declare pre- and post-constraints."
       --   DeclaredPP ppDecl ->
       --     do
-        let ppInherited = ppDecl
+        let ppInherited = inheritPP ppDecl
         -- We are adding pre-constraints from the function signature
         -- to make available at the call site the signatures
         -- of the functions passed as parameters
         let argCs = addArgsCs argNames argTypes (_pre ppInherited)
         TFunSingle _ iInfered (DeclaredPP ppInfered) <- matchBody funBody argTypes argCs
         (iDecl == iInfered) `orFail`
-          ("Returned type of a function is declared "++iDecl++" but it is "++iInfered)
+          ("Returned type of a function was declared "++iDecl++" but it is "++iInfered)
         checkPreWeaker  ppInherited ppInfered
         checkPostWeaker ppInfered ppInherited
         -- TODO clean constraints
