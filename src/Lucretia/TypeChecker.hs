@@ -18,7 +18,6 @@ import Lucretia.Language.Syntax
 import Lucretia.Language.Types
 
 import Lucretia.TypeChecker.Monad ( CM, evalCM, initState )
-import Lucretia.TypeChecker.Renaming ( applyRenaming, getRenamingOnEnv )
 import Lucretia.TypeChecker.Rules ( matchBlock )
 import Lucretia.TypeChecker.Update ( update, extend )
 import Lucretia.TypeChecker.Weakening ( weaker )
