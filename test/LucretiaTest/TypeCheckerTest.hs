@@ -67,7 +67,9 @@ outputTypeTestsData =
   , ($(nv 'bCall_identitySetFields), "D with Constraints: [C < func (Ar, Ax, Ay) [Ar < {}] -> Ar [Ar < {a: Ax, b: Ay}], D < {a: E, b: F}, E < int, Env < {i: E, identitySetFields: C, s: F, x: D}, F < string]")
   , ($(nv 'bCall_withSignature_identityNested), "B with Constraints: [A < func (X) [] -> X [], B < int, Env < {i: B, identity: A, identityNested: Y}, Y < func (X, Identity) [Identity < func (X) [] -> X []] -> X [Identity < func (X) [] -> X []]]")
   , ($(nv 'bFun_recursive), "Z with Constraints: [Env < {f: Z}, Z < func (F) [F < func (F)  -> I ] -> I [F < func (F)  -> I , I < int]]")
-  --, ($(nv 'bCall_recursive), "")
+  , ($(nv 'bCall_recursive), "B with Constraints: [B < int, Env < {f: Z}, Z < func (F) [F < func (F)  -> I ] -> I [F < func (F)  -> I , I < int]]")
+  , ($(nv 'bFun_recursive_withParams), "Z with Constraints: [Env < {f: Z}, Z < func (F, I) [F < func (F, I)  -> I ] -> I [F < func (F, I)  -> I , I < int]]")
+  , ($(nv 'bCall_recursive_withParams), "A with Constraints: [A < int, Env < {f: Z, i: A}, Z < func (F, I) [F < func (F, I)  -> I ] -> I [F < func (F, I)  -> I , I < int]]")
   --, ($(nv '), "C")
   ]
 
@@ -251,4 +253,27 @@ bFun_recursive =
     [ Return $ EFunCall "f" ["f"]
     ]
   ]
-
+bCall_recursive =
+  bFun_recursive ++
+  [ Return $ EFunCall "f" ["f"]
+  ]
+preRecursive_withParams = Map.fromList
+  [ ("F", tOrFromTFunSingle $ TFunSingle ["F", "I"] "I" InheritedPP)
+  ]
+postRecursive_withParams = Map.fromList
+  [ ("F", tOrFromTFunSingle $ TFunSingle ["F", "I"] "I" InheritedPP)
+  , ("I", tOrPrimitive KInt)
+  ]
+bFun_recursive_withParams =
+  [ SetVar "f" $ EFunDef ["f", "i"]
+    (Just $ TFunSingle ["F", "I"] "I"
+      (DeclaredPP $ PrePost preRecursive_withParams postRecursive_withParams)
+    )
+    [ Return $ EFunCall "f" ["f", "i"]
+    ]
+  ]
+bCall_recursive_withParams =
+  bFun_recursive_withParams ++
+  [ SetVar "i" cInt
+  , Return $ EFunCall "f" ["f", "i"]
+  ]
