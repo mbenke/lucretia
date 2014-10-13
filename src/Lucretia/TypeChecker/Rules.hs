@@ -23,7 +23,7 @@ import Lucretia.Language.Types
 
 import Lucretia.TypeChecker.Monad ( error, freshIType, CM )
 import Lucretia.TypeChecker.Monad ( freshIType, CM )
-import Lucretia.TypeChecker.Renaming ( applyRenaming, getRenamingOnEnv, freeVariables )
+import Lucretia.TypeChecker.Renaming ( applyRenaming, getRenaming, getRenamingOnEnv, freeVariables )
 import Lucretia.TypeChecker.Update ( update, extend )
 import Lucretia.TypeChecker.Weakening ( checkWeaker, weaker )
 
@@ -183,23 +183,25 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
       --   InheritedPP -> error $ "Containig function must declare pre- and post-constraints."
       --   DeclaredPP ppDecl ->
       --     do
-        let ppInherited = inheritPP ppDecl
-        -- We are adding pre-constraints from the function signature
-        -- to make available at the call site the signatures
-        -- of the functions passed as parameters
-        let argCs = addArgsCs argNames argTypes (_pre ppInherited)
-        TFunSingle _ iInfered (DeclaredPP ppInfered) <- matchBody funBody argTypes argCs
-        (iDecl == iInfered) `orFail`
-          ("Returned type of a function was declared "++iDecl++" but it is "++iInfered)
-        checkPreWeaker  ppInherited ppInfered
-        checkPostWeaker ppInfered ppInherited
-        -- TODO clean constraints
-        return decl
-          where
-          checkPreWeaker  :: PrePost -> PrePost -> CM ()
-          checkPreWeaker  = checkWeaker `on` _pre
-          checkPostWeaker :: PrePost -> PrePost -> CM ()
-          checkPostWeaker = checkWeaker `on` _post
+      --
+      -- We are adding pre-constraints from the function signature
+      -- to make available at the call site the signatures
+      -- of the functions passed as parameters
+      let ppInherited = inheritPP ppDecl
+      let argCs = addArgsCs argNames argTypes (_pre ppInherited)
+      TFunSingle _ iInfered (DeclaredPP ppInfered) <- matchBody funBody argTypes argCs
+      _pre ppInherited `checkWeaker` _pre ppInfered
+      checkPost argNames iInfered (_post ppInfered) iDecl (_post ppInherited)
+      -- TODO clean constraints
+      return decl
+
+    checkPost :: [IType] -> IType -> Constraints -> IType -> Constraints -> CM ()
+    checkPost argNames iInfered csInfered iDecl csDecl = do
+      renaming <- (iDecl:argNames, csDecl) `getRenaming` (iInfered:argNames, csInfered)
+      (iDecl == applyRenaming renaming iInfered) `orFail`
+        ("Returned type of a function was declared "++iDecl++" but it is "++iInfered)
+      applyRenaming renaming csInfered `checkWeaker` csDecl
+            
 
     inferSignature :: [IVar] -> Defs -> CM TFunSingle
     inferSignature argNames funBody = do
