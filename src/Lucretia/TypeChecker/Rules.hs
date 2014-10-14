@@ -40,7 +40,7 @@ matchBlock xs post = matchBlockT xs (undefinedId, PrePost emptyConstraints post)
 matchBlockT :: Defs -> Type -> CM Type
 matchBlockT [] t = return t
 matchBlockT (x:xs) (_, pp) = do
-  xT     <- matchDefFresh x pp
+  xT     <- matchDefFresh x (_post pp)
   boundT <- bind pp xT
   matchBlockT xs boundT
 
@@ -61,12 +61,12 @@ bind ppCall (iDecl, ppDecl) = do
          )
 
 -- All @IType@ variables in the returned @Type@ must be fresh, so there is no risk of @IType@ name clashes when @'bind'ing@ @Type@ of the current @Def@ to the @PrePost@ of the block preceding the @Def@.
-matchDefFresh :: Def -> PrePost -> CM Type
+matchDefFresh :: Def -> Constraints -> CM Type
 
-matchDefFresh (Return e) pp = matchExpFresh e pp
+matchDefFresh (Return e) cs = matchExpFresh e cs
 
-matchDefFresh (SetVar x e) pp = do
-  (eId, ePP) <- matchExpFresh e pp
+matchDefFresh (SetVar x e) cs = do
+  (eId, ePP) <- matchExpFresh e cs
   let setPP = setVar x eId
   bind ePP (eId, setPP)
 
@@ -79,8 +79,8 @@ matchDefFresh (SetVar x e) pp = do
           where pre  = Map.fromList [ toEmptyRec     env       ]
                 post = Map.fromList [ toSingletonRec env x eId ]
 
-matchDefFresh (SetAttr x a e) pp = do
-  (eId, ePP) <- matchExpFresh e pp
+matchDefFresh (SetAttr x a e) cs = do
+  (eId, ePP) <- matchExpFresh e cs
   xId <- freshIType
   let setPP = setAttr x xId a eId
   bind ePP (eId, setPP)
@@ -94,9 +94,9 @@ matchDefFresh (SetAttr x a e) pp = do
                                     ]
 
 -- | 'match' rules to an @Exp@ producing Type, then rename all @ITypes@ to fresh variables in that type.
-matchExpFresh :: Exp  -> PrePost -> CM Type
-matchExpFresh e pp = do
-  t <- matchExp e pp
+matchExpFresh :: Exp  -> Constraints -> CM Type
+matchExpFresh e cs = do
+  t <- matchExp e cs
   renameToFresh t
 
     where
@@ -116,7 +116,7 @@ matchExpFresh e pp = do
 -- B ...
 -- B eN
 --   e
-matchExp  :: Exp  -> PrePost -> CM Type
+matchExp  :: Exp  -> Constraints -> CM Type
 
 matchExp (EGetVar a)    _ = return (aId, PrePost constraints constraints)
   where constraints = Map.fromList [ toSingletonRec env a aId ]
@@ -132,11 +132,11 @@ matchExp (EBool _)   _ = postPointerPrimitive KBool
 matchExp  ENone      _ = postPointerPrimitive KNone
 matchExp  ENew       _ = postPointer tOrEmptyRec
 
-matchExp (EFunCall f xsCall) ppCall = do
+matchExp (EFunCall f xsCall) cs = do
   -- Pre- & post- constraints must be declared in the code.
   -- In case of other function signatures, InheritedPP should be
   -- replaced in matchExp (EFunDef ...).
-  TFunSingle tsDecl iDecl (DeclaredPP ppDecl) <- getFunType f (_post ppCall)
+  TFunSingle tsDecl iDecl (DeclaredPP ppDecl) <- getFunType f cs
   checkArgsLength xsCall tsDecl
   let ppInherited = inheritPP ppDecl
       -- Q how it should work
@@ -190,10 +190,12 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
       let ppInherited = inheritPP ppDecl
       let argCs = addArgsCs argNames argTypes (_pre ppInherited)
       TFunSingle _ iInfered (DeclaredPP ppInfered) <- matchBody funBody argTypes argCs
-      _pre ppInherited `checkWeaker` _pre ppInfered
+      checkPre ppInherited ppInfered
       checkPost argNames iInfered (_post ppInfered) iDecl (_post ppInherited)
       -- TODO clean constraints
       return decl
+
+    checkPre = checkWeaker `on` _pre
 
     checkPost :: [IType] -> IType -> Constraints -> IType -> Constraints -> CM ()
     checkPost argNames iInfered csInfered iDecl csDecl = do
