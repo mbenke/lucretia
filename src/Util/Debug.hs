@@ -1,12 +1,8 @@
-module Util.Debug(traceShowId, traceShowIdHl, traceShowIdHlWith, traceM) where
+module Util.Debug ( traceShowIdHl, traceShowIdHlWith ) where
 
-import Debug.Trace
+import Debug.Trace ( trace )
 
-import System.IO.Unsafe(unsafePerformIO)
-import Control.Monad(mzero, forM)
-
-traceShowId :: (Show a) => a -> a
-traceShowId a = traceShow a a
+import Control.Monad ( mzero, forM )
 
 traceShowIdHl :: (Show a) => a -> a
 traceShowIdHl a = trace (
@@ -22,5 +18,3 @@ traceShowIdHlWith showA a = trace (
   "\n----------------------------------------\n"
   ) a
 
-traceM :: (Monad m,Show a) => a -> m ()
-traceM a = traceShow a $ return ()
